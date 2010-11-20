@@ -10,16 +10,22 @@ local currentKey
 
 local frame, messageArea, selector, scrollBar, currentNow
 
+local safetyLock
+
 local function UpdateScrollBar()
+	if safetyLock then return end
 	local numMessages, displayed = messageArea:GetNumMessages(), messageArea:GetNumLinesDisplayed()
 	local newMax = max(0, numMessages - displayed)
 	if newMax > 0 then
-		local _, oldMax = scrollBar:GetMinMaxValues()
-		if newMax ~= oldMax then
-			local offset = oldMax - floor(scrollBar:GetValue() + 0.5)
+		safetyLock = true
+		if newMax ~= select(2, scrollBar:GetMinMaxValues()) then
 			scrollBar:SetMinMaxValues(0, newMax)
-			scrollBar:SetValue(max(0, newMax - offset))
 		end
+		local offset = max(0, newMax - messageArea:GetCurrentScroll())
+		if offset ~= scrollBar:GetValue() then
+			scrollBar:SetValue(offset)
+		end
+		safetyLock = false
 		if not scrollBar:IsShown() then
 			scrollBar:Show()
 		end
@@ -107,7 +113,7 @@ local function Selector_Initialize(frame, level, menuList)
 		end
 		table.sort(list)
 		tinsert(list, 1, key)
-		
+
 		for i, name in ipairs(list) do
 			local opt = UIDropDownMenu_CreateInfo()
 			opt.text = name
@@ -204,23 +210,29 @@ local function CreateOurFrame()
 
 	messageArea:EnableMouseWheel(true)
 	messageArea:SetScript('OnMouseWheel', function(self, delta)
-		if delta > 0 then
-			if IsShiftKeyDown() then self:ScrollToTop() else self:ScrollUp() end
-		else
-			if IsShiftKeyDown() then self:ScrollToBottom() else self:ScrollDown() end
+		local num, displayed = self:GetNumMessages(), self:GetNumLinesDisplayed()
+		local step = IsShiftKeyDown() and num or IsControlKeyDown() and displayed or 1
+		local current = self:GetCurrentScroll()
+		local newOffset = min(max(0, current + step * delta), num - displayed)
+		if newOffset ~= current then
+			self:SetScrollOffset(newOffset)
+			UpdateScrollBar()
 		end
-		UpdateScrollBar()
 	end)
 
 	scrollBar = CreateFrame("Slider", nil, frame, "UIPanelScrollBarTemplate")
 	scrollBar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -8, -44)
 	scrollBar:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -8, 24)
+	scrollBar:SetValueStep(1)
 	scrollBar.scrollStep = 3
 	frame.SetVerticalScroll = function(_, value)
+		if safetyLock then return end
 		local _, maxVal = scrollBar:GetMinMaxValues()
-		local offset = maxVal - floor(value + 0.5)
+		local offset = maxVal - value
 		if messageArea:GetCurrentScroll() ~= offset then
-			--messageArea:SetScrollOffset(offset)
+			safetyLock = true
+			messageArea:SetScrollOffset(offset)
+			safetyLock = false
 		end
 	end
 	scrollBar:Hide()

@@ -29,6 +29,9 @@ local function UpdateScrollBar()
 end
 
 local function AddMessage(name, now, text)
+	if not db.profile.names[currentKey][name] then
+		return
+	end
 	if now ~= currentNow then
 		messageArea:AddMessage(strjoin(" ", '-----', date("%X", now)), 0.6, 0.6, 0.6)
 		currentNow = now
@@ -57,29 +60,65 @@ local function SelectKey(key)
 	end
 end
 
-local function MenuEntry_IsChecked(button)
+local function KeyEntry_IsChecked(button)
 	return currentKey and button.value == currentKey
 end
 
-local function MenuEntry_OnClick(button)
+local function KeyEntry_OnClick(button)
 	SelectKey(button.value)
+end
+
+local function NameEntry_IsChecked(button)
+	return db.profile.names[button.arg1][button.value]
+end
+
+local function NameEntry_OnClick(button, key, _, checked)
+	db.profile.names[button.arg1][button.value] = checked
+	if key == currentKey then
+		RefreshMessages()
+	end
 end
 
 local list = {}
 local function Selector_Initialize(frame, level, menuList)
 	wipe(list)
-	for key in pairs(AdiDebug.messages) do
-		tinsert(list, key)
-	end
-	table.sort(list)
-	for i, key in ipairs(list) do
-		local opt = UIDropDownMenu_CreateInfo()
-		opt.text = key
-		opt.value = key
-		opt.func = MenuEntry_OnClick
-		opt.checked = MenuEntry_IsChecked
+	if level == 1 then
+		for key in pairs(AdiDebug.messages) do
+			tinsert(list, key)
+		end
+		table.sort(list)
+		for i, key in ipairs(list) do
+			local opt = UIDropDownMenu_CreateInfo()
+			opt.text = key
+			opt.value = key
+			opt.func = KeyEntry_OnClick
+			opt.checked = KeyEntry_IsChecked
+			if next(AdiDebug.names[key]) then
+				opt.hasArrow = true
+			end
 
-		UIDropDownMenu_AddButton(opt, level)
+			UIDropDownMenu_AddButton(opt, level)
+		end
+	elseif level == 2 then
+		local key = UIDROPDOWNMENU_MENU_VALUE
+
+		for name in pairs(AdiDebug.names[key]) do
+			tinsert(list, name)
+		end
+		table.sort(list)
+		tinsert(list, 1, key)
+		
+		for i, name in ipairs(list) do
+			local opt = UIDropDownMenu_CreateInfo()
+			opt.text = name
+			opt.value = name
+			opt.isNotRadio = true
+			opt.func = NameEntry_OnClick
+			opt.arg1 = key
+			opt.checked = NameEntry_IsChecked
+			opt.keepShownOnClick = true
+			UIDropDownMenu_AddButton(opt, level)
+		end
 	end
 
 	local opt = UIDropDownMenu_CreateInfo()
@@ -96,6 +135,7 @@ local function CreateOurFrame()
 			yOffset = -200,
 			width = 640,
 			height = 400,
+			names = { ['*'] = { ['*'] = true } }
 		}
 	}, true)
 

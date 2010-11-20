@@ -98,17 +98,17 @@ AdiDebug:SetScript('OnEvent', function(self, event, name)
 end)
 AdiDebug:RegisterEvent('ADDON_LOADED')
 
-function AdiDebug:LoadAndOpen()
+function AdiDebug:LoadAndOpen(arg)
 	if not IsAddOnLoaded("AdiDebug_GUI") and not LoadAddOn("AdiDebug_GUI") then
 		return
 	end
-	AdiDebug:Open()
+	AdiDebug:Open(arg)
 end
 
 SLASH_ADIDEBUG1 = "/ad"
 SLASH_ADIDEBUG2 = "/adidebug"
-function SlashCmdList.ADIDEBUG()
-	return AdiDebug:LoadAndOpen()
+function SlashCmdList.ADIDEBUG(arg)
+	return AdiDebug:LoadAndOpen(arg)
 end
 
 -- Mimics tekDebug

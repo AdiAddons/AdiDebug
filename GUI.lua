@@ -48,17 +48,21 @@ local function RefreshMessages()
 	UpdateScrollBar()
 end
 
+local function SelectKey(key)
+	if currentKey ~= key then
+		currentKey = key
+		db.profile.key = currentKey
+		selector.text:SetText(currentKey or "")
+		RefreshMessages()
+	end
+end
+
 local function MenuEntry_IsChecked(button)
 	return currentKey and button.value == currentKey
 end
 
 local function MenuEntry_OnClick(button)
-	if button.value ~= currentKey then
-		currentKey = button.value
-		db.profile.key = currentKey
-		selector.text:SetText(currentKey or "")
-		RefreshMessages()
-	end
+	SelectKey(button.value)
 end
 
 local list = {}
@@ -191,14 +195,19 @@ function AdiDebug:Callback(key, ...)
 	end
 end
 
-function AdiDebug:Open()
+function AdiDebug:Open(arg)
 	if not frame then
 		CreateOurFrame()
 	end
-	if db.profile.key and AdiDebug.messages[db.profile.key] then
-		currentKey = db.profile.key
-		selector.text:SetText(currentKey or "")
-		RefreshMessages()
+	if arg and arg ~= "" then
+		arg = strlower(arg)
+		for key in pairs(AdiDebug.messages) do
+			if strolower(key) == arg then
+				SelectKey(key)
+			end
+		end
+	elseif db.profile.key and AdiDebug.messages[db.profile.key] then
+		SelectKey(db.profile.key)
 	end
 	frame:Show()
 end

@@ -111,3 +111,17 @@ function SlashCmdList.ADIDEBUG()
 	return AdiDebug:LoadAndOpen()
 end
 
+-- Mimics tekDebug
+do
+	local function Frame_AddMessage(self, text, r, g, b) return self:Sink(text) end
+	local frames = setmetatable({}, {__index = function(t, name)
+		local frame = {
+			Sink = AdiDebug:GetSink(name),
+			AddMessage = Frame_AddMessage 
+		}
+		t[name] = frame
+		return frame
+	end})
+	_G.tekDebug = { GetFrame = function(_, name) return frames[name] end }
+end
+

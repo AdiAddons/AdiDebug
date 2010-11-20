@@ -6,7 +6,8 @@
 ## Version: @project-version@
 ## SavedVariables: AdiDebugDB
 ## X-Date: @project-date-iso@
-## OptionalDeps: Ace3
+## OptionalDeps: Ace3, tekDebug
+## LoadOnDemand: 1
 
 #@no-lib-strip@
 libs\LibStub\LibStub.lua

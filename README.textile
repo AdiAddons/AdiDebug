@@ -1,0 +1,30 @@
+AdiDebug is a debugging helper addon.
+
+It allows addon to easily (and optionnaly) send debug output into a dedicated frame.
+
+h2. How to use AdiDebug in your addon
+
+Ensure AdiDebug is loaded (if present) before your addon by adding it in the "OptionalDeps" header of your addon .TOC file.
+
+pre. # OptionalDeps: AdiDebug
+
+Then add this stub at the top of your addon:
+
+pre. local Debug
+If AdiDebug then
+	local addonName = ...
+	Debug = AdiDebug:GetSink("MyAddonName")
+else
+	Debug = function() end
+end
+
+If AdiDebug isn't loaded, you just have an empty Debug function that discards anything passed to it.
+
+h2. How to use it in game
+
+Type "/ad" or "/adidebug" to open the frame.
+
+You can select the stream to watch by using the dropdown menu in the top left corner. You can also pass it to the chat command, e.g. "/ad myaddon".
+
+You can move or resizing the frame by shift-clicking almost anywhere in it ; use the borders to resize and the interior to move. The size and position is saved across sessions.
+

@@ -29,14 +29,14 @@ local function PrettyFormat(value)
 	if value == nil then
 		return "|cffaaaaaanil|r"
 	elseif value == true or value == false then
-		return format("|cff44aaff%s|r", tostring(value))
+		return format("|cff77aaff%s|r", tostring(value))
 	elseif type(value) == "number" then
-		return format("|cffaaaaff%s|r", tostring(value))
+		return format("|cffaa77ff%s|r", tostring(value))
 	elseif type(value) == "table" then
 		if type(value[0]) == "userdata" then
 			return format("|cffffaa44[%s]|r", GetTableName(value))
 		else
-			return format("|cff44aa77[%s]|r", GetTableName(value))
+			return format("|cff44ffaa[%s]|r", GetTableName(value))
 		end
 	else
 		return tostring(value)

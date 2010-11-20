@@ -1,0 +1,12 @@
+## Interface: 40000
+
+## Title: AdiDebug - GUI
+## Notes: Adirelle's debug helper - graphical user interface.
+## Author: Adirelle
+## Version: @project-version@
+## X-Date: @project-date-iso@
+## RequiredDeps: AdiDebug
+## LoadOnDemand: 1
+
+..\AdiDebug\GUI.lua
+

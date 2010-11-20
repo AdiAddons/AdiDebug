@@ -1,0 +1,19 @@
+## Interface: 40000
+
+## Title: AdiDebug
+## Notes: Adirelle's debug helper.
+## Author: Adirelle
+## Version: @project-version@
+## SavedVariables: AdiDebugDB
+## X-Date: @project-date-iso@
+## OptionalDeps: Ace3
+
+#@no-lib-strip@
+libs\LibStub\LibStub.lua
+libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+#@end-no-lib-strip@
+
+#libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+
+AdiDebug.lua
+

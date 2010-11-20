@@ -130,7 +130,14 @@ function AdiDebug:Embed(target, key)
 	return target.Debug
 end
 
-AdiDebug:SetScript('OnUpdate', function() now = time() end)
+AdiDebug:SetScript('OnUpdate', function(_, elapsed)
+	local newTime = time()
+	if newTime == floor(now) then
+		now = now + elapsed
+	else
+		now = newTime
+	end
+end)
 
 AdiDebug:SetScript('OnEvent', function(self, event, name)
 	if name == addonName then
@@ -160,7 +167,7 @@ do
 	local frames = setmetatable({}, {__index = function(t, name)
 		local frame = {
 			Sink = AdiDebug:GetSink(name),
-			AddMessage = Frame_AddMessage 
+			AddMessage = Frame_AddMessage
 		}
 		t[name] = frame
 		return frame

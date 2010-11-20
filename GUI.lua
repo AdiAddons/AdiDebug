@@ -33,7 +33,7 @@ local function AddMessage(name, now, text)
 		return
 	end
 	if now ~= currentNow then
-		messageArea:AddMessage(strjoin(" ", '-----', date("%X", now)), 0.6, 0.6, 0.6)
+		messageArea:AddMessage(strjoin("", "----- ", date("%X", now), strsub(format("%.3f", now % 1), 2)), 0.6, 0.6, 0.6)
 		currentNow = now
 	end
 	messageArea:AddMessage(text)

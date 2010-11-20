@@ -250,15 +250,14 @@ end
 function AdiDebug:Open(arg)
 	if not frame then
 		CreateOurFrame()
-	end
-	if not arg and frame:IsShown() then
+	elseif not arg and frame:IsShown() then
 		frame:Hide()
 		return
 	end
 	if arg and arg ~= "" then
 		arg = strlower(arg)
 		for key in pairs(AdiDebug.messages) do
-			if strolower(key) == arg then
+			if strlower(key) == arg then
 				SelectKey(key)
 			end
 		end

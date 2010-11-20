@@ -158,6 +158,9 @@ end
 SLASH_ADIDEBUG1 = "/ad"
 SLASH_ADIDEBUG2 = "/adidebug"
 function SlashCmdList.ADIDEBUG(arg)
+	if strtrim(arg) == "" then
+		arg = nil
+	end
 	return AdiDebug:LoadAndOpen(arg)
 end
 

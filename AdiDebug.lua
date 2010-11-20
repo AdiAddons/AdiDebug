@@ -37,6 +37,7 @@ local function PrettyFormat(value)
 		return tostring(value)
 	end
 end
+AdiDebug.PrettyFormat = PrettyFormat
 
 local Format
 do
@@ -49,7 +50,7 @@ do
 			return PrettyFormat(...)
 		end
 		for i = 1, n do
-			local v = select(i, ...)			
+			local v = select(i, ...)
 			t[i] = type(v) == "string" and v or PrettyFormat(v)
 		end
 		return table.concat(t, " ", 1, n)
@@ -57,7 +58,7 @@ do
 end
 
 local function Record(key, name, ...)
-	local m = messages[key]	
+	local m = messages[key]
 	local t = tremove(heap, 1)
 	local text = Format(...)
 	if not t then
@@ -88,12 +89,25 @@ end
 
 AdiDebug:SetScript('OnUpdate', function() now = time() end)
 
-SLASH_ADIDEBUG1 = "/ad"
-SLASH_ADIDEBUG2 = "/adidebug"
-function SlashCmdList.ADIDEBUG()
+AdiDebug:SetScript('OnEvent', function(self, event, name)
+	if name == addonName then
+		self:SetScript('OnEvent', nil)
+		self:UnregisterEvent('ADDON_LOADED')
+		self.db = LibStub('AceDB-3.0'):New('AdiDebugDB', { profile = { shown = false } }, true)
+	end
+end)
+AdiDebug:RegisterEvent('ADDON_LOADED')
+
+function AdiDebug:LoadAndOpen()
 	if not IsAddOnLoaded("AdiDebug_GUI") and not LoadAddOn("AdiDebug_GUI") then
 		return
 	end
 	AdiDebug:Open()
+end
+
+SLASH_ADIDEBUG1 = "/ad"
+SLASH_ADIDEBUG2 = "/adidebug"
+function SlashCmdList.ADIDEBUG()
+	return AdiDebug:LoadAndOpen()
 end
 

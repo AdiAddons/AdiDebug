@@ -4,9 +4,11 @@ Copyright 2010 Adirelle (adirelle@tagada-team.net)
 All rights reserved.
 --]]
 
+local db
+
 local currentKey
 
-local messageArea, selector, scrollBar, currentNow
+local frame, messageArea, selector, scrollBar, currentNow
 
 local function UpdateScrollBar()
 	local numMessages, displayed = messageArea:GetNumMessages(), messageArea:GetNumLinesDisplayed()
@@ -53,6 +55,7 @@ end
 local function MenuEntry_OnClick(button)
 	if button.value ~= currentKey then
 		currentKey = button.value
+		db.profile.key = currentKey
 		selector.text:SetText(currentKey or "")
 		RefreshMessages()
 	end
@@ -74,25 +77,64 @@ local function Selector_Initialize(frame, level, menuList)
 
 		UIDropDownMenu_AddButton(opt, level)
 	end
-	
+
 	local opt = UIDropDownMenu_CreateInfo()
 	opt.text = "Close menu"
 	opt.notCheckable = true
 	UIDropDownMenu_AddButton(opt, level)
 end
 
-local function PopFrame()
-	local frame = CreateFrame("Frame", "AdiDebug", UIParent)
+local function CreateOurFrame()
+	db = AdiDebug.db:RegisterNamespace("GUI", {
+		profile = {
+			point = "TOPLEFT",
+			xOffset = 16,
+			yOffset = -200,
+			width = 640,
+			height = 400,
+		}
+	}, true)
+
+	frame = CreateFrame("Frame", "AdiDebug", UIParent)
 	frame:SetBackdrop({
 		bgFile = [[Interface\Tooltips\UI-Tooltip-Background]], tile = true, tileSize = 16,
-		edgeFile = [[Interface\Tooltips\UI-Tooltip-Border]], edgeSize = 16, 
-		insets = { left = 5, right = 5, top = 5, bottom = 5 },
+		edgeFile = [[Interface\Tooltips\UI-Tooltip-Border]], edgeSize = 16,
+		insets = { left = 4, right = 4, top = 4, bottom = 4 },
 	})
 	frame:SetBackdropColor(0,0,0,1)
 	frame:SetBackdropBorderColor(1,1,1,1)
-	frame:SetSize(640, 400)
-	frame:SetPoint("TOPLEFT", 16, -200)
+	frame:SetSize(db.profile.width, db.profile.height)
+	frame:SetPoint(db.profile.point, db.profile.xOffset, db.profile.yOffset)
 	frame:SetClampedToScreen(true)
+	frame:SetMovable(true)
+	frame:SetResizable(true)
+
+	frame:EnableMouse(true)
+	frame:SetScript('OnMouseDown', function(self)
+		if not self.movingOrSizing and IsShiftKeyDown() then
+			local x, y = GetCursorPosition()
+			local scale = self:GetEffectiveScale()
+			local left, bottom, width, height = self:GetRect()
+			x, y = (x / scale) - left, (y / scale) - bottom
+			local horiz = (x < 16) and "LEFT" or (x > width - 16) and "RIGHT"
+			local vert = (y < 16) and "BOTTOM" or (y > height - 16) and "TOP"
+			if horiz or vert then
+				self:StartSizing(strjoin("", vert or "", horiz or ""))
+			else
+				self:StartMoving()
+			end
+			self.movingOrSizing = true
+		end
+	end)
+	frame:SetScript('OnMouseUp', function(self)
+		if self.movingOrSizing then
+			self.movingOrSizing = nil
+			frame:StopMovingOrSizing()
+			db.profile.width, db.profile.height = frame:GetSize()
+			local _
+			_, _, db.profile.point, db.profile.xOffset, db.profile.yOffset = frame:GetPoint()
+		end
+	end)
 
 	local closeButton = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
 	closeButton:SetPoint("TOPRIGHT")
@@ -100,20 +142,32 @@ local function PopFrame()
 
 	selector = CreateFrame("Button", "AdiDebugDropdown", frame, "UIDropDownMenuTemplate")
 	selector:SetPoint("TOPLEFT", -12, -4)
+	selector:SetWidth(145)
 	selector.initialize = Selector_Initialize
 	selector.text = _G["AdiDebugDropdownText"]
-	
+
 	messageArea = CreateFrame("ScrollingMessageFrame", nil, frame)
 	messageArea:SetPoint("TOPLEFT", frame, "TOPLEFT", 8, -28)
 	messageArea:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -24, 8)
 	messageArea:SetFading(false)
 	messageArea:SetJustifyH("LEFT")
 	messageArea:SetMaxLines(550)
-	messageArea:SetFontObject(ChatFontSmall)
+	messageArea:SetFontObject(ChatFontNormal)
 	messageArea:SetHyperlinksEnabled(false)
 	messageArea:SetScript('OnMessageScrollChanged', UpdateScrollBar)
 	messageArea:SetScript('OnSizeChanged', UpdateScrollBar)
-		
+	messageArea:SetIndentedWordWrap(true)
+
+	messageArea:EnableMouseWheel(true)
+	messageArea:SetScript('OnMouseWheel', function(self, delta)
+		if delta > 0 then
+			if IsShiftKeyDown() then self:ScrollToTop() else self:ScrollUp() end
+		else
+			if IsShiftKeyDown() then self:ScrollToBottom() else self:ScrollDown() end
+		end
+		UpdateScrollBar()
+	end)
+
 	scrollBar = CreateFrame("Slider", nil, frame, "UIPanelScrollBarTemplate")
 	scrollBar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -8, -44)
 	scrollBar:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -8, 24)
@@ -122,13 +176,12 @@ local function PopFrame()
 		local _, maxVal = scrollBar:GetMinMaxValues()
 		local offset = maxVal - floor(value + 0.5)
 		if messageArea:GetCurrentScroll() ~= offset then
-			messageArea:SetScrollOffset(offset)
+			--messageArea:SetScrollOffset(offset)
 		end
 	end
-	
+	scrollBar:Hide()
+
 	frame:SetScript('OnShow', UpdateScrollBar)
-	
-	return frame
 end
 
 function AdiDebug:Callback(key, ...)
@@ -140,8 +193,15 @@ end
 
 function AdiDebug:Open()
 	if not frame then
-		frame = PopFrame()
+		CreateOurFrame()
+	end
+	if db.profile.key and AdiDebug.messages[db.profile.key] then
+		currentKey = db.profile.key
+		selector.text:SetText(currentKey or "")
+		RefreshMessages()
 	end
 	frame:Show()
 end
+
+AdiDebug.LoadAndOpen = AdiDebug.Open
 

@@ -126,7 +126,7 @@ local function PopFrame()
 		end
 	end
 	
-	frame:SetScript('OnShow', function() UpdateScrollBar() end)
+	frame:SetScript('OnShow', UpdateScrollBar)
 	
 	return frame
 end

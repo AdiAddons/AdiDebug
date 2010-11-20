@@ -16,17 +16,22 @@ AdiDebug.messages = messages
 
 local function PrettyFormat(value)
 	if value == nil then
-		return "|cff777777nil|r"
-	elseif type(value) == "bool" then
-		return format("|cff0077ff%s|r", tostring(value))
+		return "|cffaaaaaanil|r"
+	elseif value == true or value == false then
+		return format("|cff44aaff%s|r", tostring(value))
 	elseif type(value) == "number" then
-		return format("|cff7777ff%s|r", tostring(value))
+		return format("|cffaaaaff%s|r", tostring(value))
 	elseif type(value) == "table" then
-		local name = tostring(type(value.GetName) == "function" and value:GetName() or value)
+		local name = tostring(
+			(type(value.GetName) == "function" and value:GetName())
+			or (type(value.ToString) == "function" and value:ToString())
+			or value.name
+			or gsub(tostring(value), '^table: ', '')
+		)
 		if type(value[0]) == "userdata" then
-			return format("|cffff7700[%s]|r", name)
+			return format("|cffffaa44[%s]|r", name)
 		else
-			return format("|cff00ff77[%s]|r", name)
+			return format("|cff44aa77[%s]|r", name)
 		end
 	else
 		return tostring(value)
@@ -91,5 +96,4 @@ function SlashCmdList.ADIDEBUG()
 	end
 	AdiDebug:Open()
 end
-
 

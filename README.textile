@@ -22,9 +22,9 @@ If AdiDebug isn't loaded, you just have an empty Debug function that discards an
 
 h2. How to use it in game
 
-Type "/ad" or "/adidebug" to open the frame.
+Type "/ad" or "/adidebug" to toggle the frame.
 
-You can select the stream to watch by using the dropdown menu in the top left corner. You can also pass it to the chat command, e.g. "/ad myaddon".
+You can select the stream to watch by using the dropdown menu in the top left corner. You can also pass the name to the chat command, e.g. "/ad myaddon".
 
-You can move or resizing the frame by shift-clicking almost anywhere in it ; use the borders to resize and the interior to move. The size and position is saved across sessions.
+You can move or resizing the frame by shift-clicking almost anywhere in it ; use the borders to resize and the interior to move. Size and position are saved across sessions.
 

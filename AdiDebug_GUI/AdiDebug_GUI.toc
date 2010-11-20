@@ -1,7 +1,7 @@
 ## Interface: 40000
 
 ## Title: AdiDebug - GUI
-## Notes: Adirelle's debug helper - graphical user interface.
+## Notes: Adirelle's debug frame - graphical user interface.
 ## Author: Adirelle
 ## Version: @project-version@
 ## X-Date: @project-date-iso@

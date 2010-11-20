@@ -1,5 +1,5 @@
 --[[
-AdiDebug - Adirelle's debug helper.
+AdiDebug - Adirelle's debug frame.
 Copyright 2010 Adirelle (adirelle@tagada-team.net)
 All rights reserved.
 --]]

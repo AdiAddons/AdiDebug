@@ -11,8 +11,7 @@ pre. # OptionalDeps: AdiDebug
 Then add this stub at the top of your addon:
 
 pre. local Debug
-If AdiDebug then
-	local addonName = ...
+if AdiDebug then
 	Debug = AdiDebug:GetSink("MyAddonName")
 else
 	Debug = function() end
@@ -20,11 +19,30 @@ end
 
 If AdiDebug isn't loaded, you just have an empty Debug function that discards anything passed to it.
 
+When using frames or AceAddon-3.0, you can also use the AdiDebug:Embed method:
+
+pre. addon = LibStub('AceAddon-3.0'):NewAddon("MyAddonName")
+if AdiDebug then
+	AdiDebug:Embed(addon, "MyAddonName")
+else
+	addon.Debug = function() end
+end
+
+You can then safely reuse the Debug method from within addon modules:
+
+pre. addon:SetDefaultModulePrototype({ Debug = addon.Debug })
+
+In this case, AdiDebug will automatically extract the module or frame name to create a filtering subentry (see below):
+
 h2. How to use it in game
 
 Type "/ad" or "/adidebug" to toggle the frame.
 
 You can select the stream to watch by using the dropdown menu in the top left corner. You can also pass the name to the chat command, e.g. "/ad myaddon".
 
+The entry submenues allow you to filter what you would see or not if the addon used AdiDebug:Embed.
+
 You can move or resizing the frame by shift-clicking almost anywhere in it ; use the borders to resize and the interior to move. Size and position are saved across sessions.
+
+You can scroll using the scrollbar or the mousewheel on the text area, with shift to go directly to top/bottom or control to skip pages.
 

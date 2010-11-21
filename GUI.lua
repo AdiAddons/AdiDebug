@@ -168,6 +168,19 @@ local function NameEntry_OnClick(button, key, _, checked)
 	end
 end
 
+local function ShowTooltipText(self)
+	GameTooltip:ClearLines()
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+	GameTooltip:SetText(self.tooltipText)
+	GameTooltip:Show()
+end
+
+local function AttachTooltip(target, text)
+	target.tooltipText = text
+	target:SetScript('OnEnter', ShowTooltipText)
+	target:SetScript('OnLeave', GameTooltip_Hide)
+end
+
 local list = {}
 local function Selector_Initialize(frame, level, menuList)
 	wipe(list)
@@ -224,7 +237,9 @@ local function CreateOurFrame()
 			yOffset = -200,
 			width = 640,
 			height = 400,
-			names = { ['*'] = { ['*'] = true } }
+			names = { ['*'] = { ['*'] = true } },
+			autoFadeOut = true,
+			maxOpacity = 0.95,
 		}
 	}, true)
 
@@ -275,12 +290,14 @@ local function CreateOurFrame()
 	})
 	background:SetBackdropColor(0,0,0,0.9)
 	background:SetBackdropBorderColor(1,1,1,1)
-	background:SetFrameLevel(frame:GetFrameLevel()-1)
-	local MIN_ALPHA, MAX_ALPHA, ALPHA_DELAY = 0.1, 1, 0.25
+	local MIN_ALPHA, ALPHA_DELAY = 0.1, 0.25
+	local function MaxOpacity()
+		return not db.profile.autoFadeOut or frame.movingOrSizing or frame:IsMouseOver()
+	end
 	background:SetScript('OnUpdate', function(self, elapsed)
 		local alpha, newAlpha = self:GetAlpha()
-		if frame.movingOrSizing or self:IsMouseOver() then
-			newAlpha = min(MAX_ALPHA, alpha + elapsed / ALPHA_DELAY)
+		if MaxOpacity() then
+			newAlpha = min(db.profile.maxOpacity, alpha + elapsed / ALPHA_DELAY)
 		else
 			newAlpha = max(MIN_ALPHA, alpha - elapsed / ALPHA_DELAY)
 		end
@@ -288,17 +305,19 @@ local function CreateOurFrame()
 			self:SetAlpha(newAlpha)
 		end
 	end)
-	background:SetScript('OnShow', function(self) self:SetAlpha(self:IsMouseOver() and MAX_ALPHA or MIN_ALPHA) end)
+	background:SetScript('OnShow', function(self) self:SetAlpha(MaxOpacity() and db.profile.maxOpacity or MIN_ALPHA) end)
 
 	local closeButton = CreateFrame("Button", nil, background, "UIPanelCloseButton")
 	closeButton:SetPoint("TOPRIGHT")
 	closeButton:SetScript('OnClick', function() frame:Hide() end)
+	AttachTooltip(closeButton, "Hide")
 
 	selector = CreateFrame("Button", "AdiDebugDropdown", background, "UIDropDownMenuTemplate")
 	selector:SetPoint("TOPLEFT", -12, -4)
 	selector:SetWidth(145)
 	selector.initialize = Selector_Initialize
 	selector.text = _G["AdiDebugDropdownText"]
+	AttachTooltip(selector, "Debugging stream\nSelect the debugging stream to watch.")
 
 	messageArea = CreateFrame("ScrollingMessageFrame", nil, frame)
 	messageArea:SetPoint("TOPLEFT", frame, "TOPLEFT", 8, -28)
@@ -312,6 +331,7 @@ local function CreateOurFrame()
 	messageArea:SetScript('OnMessageScrollChanged', UpdateScrollBar)
 	messageArea:SetScript('OnSizeChanged', UpdateScrollBar)
 	messageArea:SetIndentedWordWrap(true)
+	messageArea:Raise()
 
 	messageArea:SetHyperlinksEnabled(true)
 	messageArea:SetScript('OnHyperlinkClick', OnHyperlinkClick)
@@ -346,6 +366,31 @@ local function CreateOurFrame()
 		end
 	end
 	scrollBar:Hide()
+
+	local autoFadeButton = CreateFrame("CheckButton", nil, background, "UICheckButtonTemplate")
+	autoFadeButton:RegisterForClicks("anyup")
+	autoFadeButton:SetSize(24, 24)
+	autoFadeButton:SetPoint("TOPRIGHT", -32, -4)
+	autoFadeButton:SetScript('OnClick', function() db.profile.autoFadeOut = not not autoFadeButton:GetChecked()	end)
+	autoFadeButton:SetChecked(db.profile.autoFadeOut)
+	AttachTooltip(autoFadeButton, "Auto fade out\nAutomatically fade out the frame when the mouse cursor is not hovering it.")
+
+	local opacitySlider = CreateFrame("Slider", nil, background)
+	opacitySlider:SetSize(80, 16)
+	opacitySlider:EnableMouse(true)
+	opacitySlider:SetOrientation("HORIZONTAL")
+	opacitySlider:SetBackdrop({
+		bgFile = [[Interface\Buttons\UI-SliderBar-Background]], tile = true, tileSize = 8,
+		edgeFile = [[Interface\Buttons\UI-SliderBar-Border]], edgeSize = 8,
+		insets = { left = 3, right = 3, top = 6, bottom = 6 }
+	})
+	opacitySlider:SetThumbTexture([[Interface\Buttons\UI-SliderBar-Button-Horizontal]])
+	opacitySlider:SetPoint("TOPRIGHT", -64, -8)
+	opacitySlider:SetValueStep(0.05)
+	opacitySlider:SetMinMaxValues(0.2, 1.0)
+	opacitySlider:SetValue(db.profile.maxOpacity)
+	opacitySlider:SetScript('OnValueChanged', function(_, value) db.profile.maxOpacity = value end)
+	AttachTooltip(opacitySlider, "Frame opacity\nAdjust maximal frame opacity.")
 
 	frame:SetScript('OnShow', UpdateScrollBar)
 end

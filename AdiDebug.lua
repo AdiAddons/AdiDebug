@@ -20,6 +20,20 @@ local heap = setmetatable({}, {__mode='kv'})
 AdiDebug.messages = messages
 AdiDebug.names = names
 
+local safecall
+do
+	local function safecall_inner(ok, ...)
+		if ok then
+			return ...
+		else
+			geterrorhandler()(...)
+		end
+	end
+	function safecall(func, ...)
+		return safecall_inner(pcall(func, ...))
+	end
+end
+
 local function GetTableName(value)
 	return tostring(
 		(type(value.GetName) == "function" and value:GetName())
@@ -101,7 +115,7 @@ local sinkMethods = {}
 
 function AdiDebug:GetSink(key)
 	if not sinkFuncs[key] then
-		sinkFuncs[key] = function(...) return Sink(key, key, ...) end
+		sinkFuncs[key] = function(...) return safecall(Sink, key, key, ...) end
 		AddKey(key)
 	end
 	return sinkFuncs[key]
@@ -111,7 +125,7 @@ function AdiDebug:Embed(target, key)
 	assert(type(target) == "table", "AdiDebug:Embed(target[, key]): target should be a table.")
 	assert(type(key) == "string", "AdiDebug:Embed(target[, key]): key should be a string.")
 	if not sinkMethods[key] then
-		sinkMethods[key] = function(self, ...) return Sink(key, GetTableName(self), self, ...) end
+		sinkMethods[key] = function(self, ...) return safecall(Sink, key, GetTableName(self), self, ...) end
 		AddKey(key)
 	end
 	target.Debug = sinkMethods[key]

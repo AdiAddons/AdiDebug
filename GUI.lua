@@ -13,6 +13,9 @@ local frame, messageArea, selector, scrollBar, currentNow
 local safetyLock
 
 local function UpdateScrollBar()
+	if GameTooltip:GetOwner() == messageArea then
+		GameTooltip:Hide()
+	end
 	if safetyLock then return end
 	local numMessages, displayed = messageArea:GetNumMessages(), messageArea:GetNumLinesDisplayed()
 	local newMax = max(0, numMessages - displayed)
@@ -38,6 +41,9 @@ local function AddMessage(name, now, text)
 	if not db.profile.names[currentKey][name] then
 		return
 	end
+	if GameTooltip:GetOwner() == messageArea then
+		GameTooltip:Hide()
+	end	
 	if now ~= currentNow then
 		messageArea:AddMessage(strjoin("", "----- ", date("%X", now), strsub(format("%.3f", now % 1), 2)), 0.6, 0.6, 0.6)
 		currentNow = now
@@ -64,6 +70,83 @@ local function SelectKey(key)
 		selector.text:SetText(currentKey or "")
 		RefreshMessages()
 	end
+end
+
+local GetTableHyperlinkTable = AdiDebug.GetTableHyperlinkTable
+local PrettyFormat = AdiDebug.PrettyFormat
+
+local function ShowFrameTooltip(frame)
+	GameTooltip:AddDoubleLine("Type:", PrettyFormat(frame:GetObjectType()))
+	GameTooltip:AddDoubleLine("Parent:", PrettyFormat(frame:GetParent()))
+	if frame:IsObjectType("Region") then
+		GameTooltip:AddDoubleLine("Protected:", PrettyFormat(not not frame:IsProtected()))
+		local top, bottom, width, height = frame:GetRect()
+		GameTooltip:AddDoubleLine("Bottom left:", format("%g,%g", top, bottom))
+		GameTooltip:AddDoubleLine("Size:", format("%g,%g", width, height))
+	end
+	if frame.GetAlpha and frame.IsShown and frame.IsVisible then -- Duck typing
+		GameTooltip:AddDoubleLine("Alpha:", PrettyFormat(frame:GetAlpha()))
+		GameTooltip:AddDoubleLine("Shown:", PrettyFormat(not not frame:IsShown()))
+		GameTooltip:AddDoubleLine("Visible:", PrettyFormat(not not frame:IsVisible()))
+	end
+	if frame:IsObjectType("Frame") then
+		GameTooltip:AddDoubleLine("Strata:", PrettyFormat(frame:GetFrameStrata()))
+		GameTooltip:AddDoubleLine("Level:", PrettyFormat(frame:GetFrameLevel()))
+	end
+end
+
+local function ShowTableTooltip(value)
+	local mt = setmetatable(value, nil)
+	GameTooltip:AddDoubleLine("Metatable:", PrettyFormat(mt))
+	local n = 0
+	for k, v in pairs(value) do
+		if n < 10 then
+			GameTooltip:AddDoubleLine(PrettyFormat(k), PrettyFormat(v))
+		end
+		n = n + 1		
+	end
+	if n >= 10 then
+		GameTooltip:AddLine(format("%d more entries", n-10))
+	end
+	setmetatable(value, mt)
+end
+
+local function OnHyperlinkClick(self, data, link)
+	GameTooltip:ClearLines()
+	GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
+	local linkType, linkData = strsplit(':', data, 2)
+	local ownLink = strmatch(linkType, '^AdiDebug(%w+)$')
+	if ownLink then
+		GameTooltip:AddDoubleLine(ownLink, link)
+		local value = GetTableHyperlinkTable(link)
+		if value then
+			if ownLink == "Table" then
+				ShowTableTooltip(value)
+			else
+				ShowFrameTooltip(value)
+			end
+		else
+			GameTooltip:AddLine("Has been collected")
+		end
+	else
+		GameTooltip:SetHyperlink(link)
+	end
+	GameTooltip:Show()
+end
+
+local function OnHyperlinkEnter(self, data, link)
+	GameTooltip:ClearLines()
+	GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
+	GameTooltip:AddLine(link)
+	local linkType, linkData = strsplit(':', data, 2)
+	local ownLink = strmatch(linkType, '^AdiDebug(%w+)$')
+	if ownLink then
+		GameTooltip:AddDoubleLine("Type:", ownLink)
+	else
+		GameTooltip:AddDoubleLine("Type:", linkType)
+	end
+	GameTooltip:AddDoubleLine("Data:", linkData)
+	GameTooltip:Show()
 end
 
 local function KeyEntry_IsChecked(button)
@@ -158,6 +241,8 @@ local function CreateOurFrame()
 	frame:SetClampedToScreen(true)
 	frame:SetMovable(true)
 	frame:SetResizable(true)
+	frame:SetFrameStrata("FULLSCREEN_DIALOG")
+	frame:SetToplevel(true)
 
 	frame:EnableMouse(true)
 	frame:SetScript('OnMouseDown', function(self)
@@ -203,10 +288,15 @@ local function CreateOurFrame()
 	messageArea:SetJustifyH("LEFT")
 	messageArea:SetMaxLines(550)
 	messageArea:SetFontObject(ChatFontSmall)
-	messageArea:SetHyperlinksEnabled(false)
 	messageArea:SetScript('OnMessageScrollChanged', UpdateScrollBar)
 	messageArea:SetScript('OnSizeChanged', UpdateScrollBar)
 	messageArea:SetIndentedWordWrap(true)
+
+	messageArea:SetHyperlinksEnabled(true)
+	messageArea:SetScript('OnHyperlinkClick', OnHyperlinkClick)
+	messageArea:SetScript('OnHyperlinkEnter', OnHyperlinkEnter)
+	messageArea:SetScript('OnHyperlinkLeave', GameTooltip_Hide)
+
 
 	messageArea:EnableMouseWheel(true)
 	messageArea:SetScript('OnMouseWheel', function(self, delta)

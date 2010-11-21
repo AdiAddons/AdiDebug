@@ -34,7 +34,6 @@ do
 	end
 end
 
-local tableNameCache
 do
 	local function GuessTableName(value)
 		return
@@ -56,12 +55,46 @@ do
 			return name
 		end
 	})
-end
 
-local function GetTableName(value)
-	return type(value) == "table" and tableNameCache[value] or tostring(value)
+	function AdiDebug.GetTableName(value)
+		return type(value) == "table" and tableNameCache[value] or tostring(value)
+	end
 end
-AdiDebug.GetTableName = GetTableName
+local GetTableName = AdiDebug.GetTableName
+
+do
+	local function BuildHyperLink(value)
+		local name = GetTableName(value)
+		local color, linkType
+		if type(value[0]) == "userdata" then
+			color, linkType = "ffaa44", "Frame"
+		else
+			color, linkType = "44ffaa", "Table"
+		end
+		return format("|cff%s|HAdiDebug%s:%s|h[%s]|h|r", color, linkType, name, name)
+	end
+	
+	local refs = setmetatable({}, {__mode = 'v'})
+	local linkCache = setmetatable({}, {
+		__mode = 'k',
+		__index = function(self, value)
+			local link = BuildHyperLink(value)
+			refs[link] = value
+			self[value] = link
+			return link
+		end
+	})
+
+	function AdiDebug.GetTableHyperlink(value)
+		return type(value) == "table" and linkCache[value]
+	end
+	
+	function AdiDebug.GetTableHyperlinkTable(link)
+		return link and refs[link]
+	end
+	
+end
+local GetTableHyperlink = AdiDebug.GetTableHyperlink
 
 local function PrettyFormat(value)
 	if value == nil then
@@ -71,11 +104,7 @@ local function PrettyFormat(value)
 	elseif type(value) == "number" then
 		return format("|cffaa77ff%s|r", tostring(value))
 	elseif type(value) == "table" then
-		if type(value[0]) == "userdata" then
-			return format("|cffffaa44[%s]|r", GetTableName(value))
-		else
-			return format("|cff44ffaa[%s]|r", GetTableName(value))
-		end
+		return GetTableHyperlink(value)
 	else
 		return tostring(value)
 	end

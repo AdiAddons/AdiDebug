@@ -43,7 +43,7 @@ local function AddMessage(name, now, text)
 	end
 	if GameTooltip:GetOwner() == messageArea then
 		GameTooltip:Hide()
-	end	
+	end
 	if now ~= currentNow then
 		messageArea:AddMessage(strjoin("", "----- ", date("%X", now), strsub(format("%.3f", now % 1), 2)), 0.6, 0.6, 0.6)
 		currentNow = now
@@ -103,7 +103,7 @@ local function ShowTableTooltip(value)
 		if n < 10 then
 			GameTooltip:AddDoubleLine(PrettyFormat(k), PrettyFormat(v))
 		end
-		n = n + 1		
+		n = n + 1
 	end
 	if n >= 10 then
 		GameTooltip:AddLine(format("%d more entries", n-10))
@@ -229,16 +229,11 @@ local function CreateOurFrame()
 	}, true)
 
 	frame = CreateFrame("Frame", "AdiDebug", UIParent)
-	frame:SetBackdrop({
-		bgFile = [[Interface\Tooltips\UI-Tooltip-Background]], tile = true, tileSize = 16,
-		edgeFile = [[Interface\Tooltips\UI-Tooltip-Border]], edgeSize = 16,
-		insets = { left = 4, right = 4, top = 4, bottom = 4 },
-	})
-	frame:SetBackdropColor(0,0,0,1)
-	frame:SetBackdropBorderColor(1,1,1,1)
+	frame:Hide()
 	frame:SetSize(db.profile.width, db.profile.height)
 	frame:SetPoint(db.profile.point, db.profile.xOffset, db.profile.yOffset)
 	frame:SetClampedToScreen(true)
+	frame:SetClampRectInsets(4,-4,-4,4)
 	frame:SetMovable(true)
 	frame:SetResizable(true)
 	frame:SetFrameStrata("FULLSCREEN_DIALOG")
@@ -271,11 +266,35 @@ local function CreateOurFrame()
 		end
 	end)
 
-	local closeButton = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+	local background = CreateFrame("Frame", nil, frame)
+	background:SetAllPoints(frame)
+	background:SetBackdrop({
+		bgFile = [[Interface\Addons\AdiDebug\media\white16x16]], tile = true, tileSize = 16,
+		edgeFile = [[Interface\Tooltips\UI-Tooltip-Border]], edgeSize = 16,
+		insets = { left = 4, right = 4, top = 4, bottom = 4 },
+	})
+	background:SetBackdropColor(0,0,0,0.9)
+	background:SetBackdropBorderColor(1,1,1,1)
+	background:SetFrameLevel(frame:GetFrameLevel()-1)
+	local MIN_ALPHA, MAX_ALPHA, ALPHA_DELAY = 0.1, 1, 0.25
+	background:SetScript('OnUpdate', function(self, elapsed)
+		local alpha, newAlpha = self:GetAlpha()
+		if frame.movingOrSizing or self:IsMouseOver() then
+			newAlpha = min(MAX_ALPHA, alpha + elapsed / ALPHA_DELAY)
+		else
+			newAlpha = max(MIN_ALPHA, alpha - elapsed / ALPHA_DELAY)
+		end
+		if newAlpha ~= alpha then
+			self:SetAlpha(newAlpha)
+		end
+	end)
+	background:SetScript('OnShow', function(self) self:SetAlpha(self:IsMouseOver() and MAX_ALPHA or MIN_ALPHA) end)
+
+	local closeButton = CreateFrame("Button", nil, background, "UIPanelCloseButton")
 	closeButton:SetPoint("TOPRIGHT")
 	closeButton:SetScript('OnClick', function() frame:Hide() end)
 
-	selector = CreateFrame("Button", "AdiDebugDropdown", frame, "UIDropDownMenuTemplate")
+	selector = CreateFrame("Button", "AdiDebugDropdown", background, "UIDropDownMenuTemplate")
 	selector:SetPoint("TOPLEFT", -12, -4)
 	selector:SetWidth(145)
 	selector.initialize = Selector_Initialize
@@ -287,7 +306,9 @@ local function CreateOurFrame()
 	messageArea:SetFading(false)
 	messageArea:SetJustifyH("LEFT")
 	messageArea:SetMaxLines(550)
-	messageArea:SetFontObject(ChatFontSmall)
+	messageArea:SetFontObject(ChatFontNormal)
+	messageArea:SetShadowOffset(1, -1)
+	messageArea:SetShadowColor(0, 0, 0, 1)
 	messageArea:SetScript('OnMessageScrollChanged', UpdateScrollBar)
 	messageArea:SetScript('OnSizeChanged', UpdateScrollBar)
 	messageArea:SetIndentedWordWrap(true)
@@ -296,7 +317,6 @@ local function CreateOurFrame()
 	messageArea:SetScript('OnHyperlinkClick', OnHyperlinkClick)
 	messageArea:SetScript('OnHyperlinkEnter', OnHyperlinkEnter)
 	messageArea:SetScript('OnHyperlinkLeave', GameTooltip_Hide)
-
 
 	messageArea:EnableMouseWheel(true)
 	messageArea:SetScript('OnMouseWheel', function(self, delta)
@@ -310,12 +330,12 @@ local function CreateOurFrame()
 		end
 	end)
 
-	scrollBar = CreateFrame("Slider", nil, frame, "UIPanelScrollBarTemplate")
+	scrollBar = CreateFrame("Slider", nil, background, "UIPanelScrollBarTemplate")
 	scrollBar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -8, -44)
 	scrollBar:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -8, 24)
 	scrollBar:SetValueStep(1)
 	scrollBar.scrollStep = 3
-	frame.SetVerticalScroll = function(_, value)
+	scrollBar:GetParent().SetVerticalScroll = function(_, value)
 		if safetyLock then return end
 		local _, maxVal = scrollBar:GetMinMaxValues()
 		local offset = maxVal - value

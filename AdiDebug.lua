@@ -34,14 +34,34 @@ do
 	end
 end
 
-local function GetTableName(value)
-	return tostring(
-		(type(value.GetName) == "function" and value:GetName())
-		or (type(value.ToString) == "function" and value:ToString())
-		or value.name
-		or gsub(tostring(value), '^table: ', '')
-	)
+local tableNameCache
+do
+	local function GuessTableName(value)
+		return
+			(type(value.GetName) == "function" and value:GetName())
+			or (type(value.ToString) == "function" and value:ToString())
+			or value.name
+	end
+
+	tableNameCache = setmetatable({}, {
+		__mode = 'k',
+		__index = function(self, value)
+			local name = safecall(GuessTableName, value)
+			if not name then
+				local mt = setmetatable(value, nil)
+				name = gsub(tostring(value), 'table: ', '')
+				setmetatable(value, mt)
+			end
+			self[value] = name
+			return name
+		end
+	})
 end
+
+local function GetTableName(value)
+	return type(value) == "table" and tableNameCache[value] or tostring(value)
+end
+AdiDebug.GetTableName = GetTableName
 
 local function PrettyFormat(value)
 	if value == nil then

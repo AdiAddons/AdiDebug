@@ -47,7 +47,8 @@ do
 		__index = function(self, value)
 			local name = safecall(GuessTableName, value)
 			if not name then
-				local mt = setmetatable(value, nil)
+				local mt = getmetatable(value)
+				setmetatable(value, nil)
 				name = gsub(tostring(value), 'table: ', '')
 				setmetatable(value, mt)
 			end

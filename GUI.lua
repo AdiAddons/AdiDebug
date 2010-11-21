@@ -96,7 +96,8 @@ local function ShowFrameTooltip(frame)
 end
 
 local function ShowTableTooltip(value)
-	local mt = setmetatable(value, nil)
+	local mt = getmetatable(value)
+	setmetatable(value, nil)
 	GameTooltip:AddDoubleLine("Metatable:", PrettyFormat(mt))
 	local n = 0
 	for k, v in pairs(value) do
@@ -106,7 +107,7 @@ local function ShowTableTooltip(value)
 		n = n + 1
 	end
 	if n >= 10 then
-		GameTooltip:AddLine(format("%d more entries", n-10))
+		GameTooltip:AddLine(format("|cffaaaaaa%d more entries...|r", n-10))
 	end
 	setmetatable(value, mt)
 end

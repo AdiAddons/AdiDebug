@@ -238,12 +238,12 @@ local function CreateOurFrame()
 			width = 640,
 			height = 400,
 			names = { ['*'] = { ['*'] = true } },
-			autoFadeOut = true,
-			maxOpacity = 0.95,
+			autoFadeOut = false,
+			opacity = 0.95,
 		}
 	}, true)
 
-	frame = CreateFrame("Frame", "AdiDebug", UIParent)
+	frame = CreateFrame("Frame", "AdiDebugFrame", UIParent)
 	frame:Hide()
 	frame:SetSize(db.profile.width, db.profile.height)
 	frame:SetPoint(db.profile.point, db.profile.xOffset, db.profile.yOffset)
@@ -253,6 +253,7 @@ local function CreateOurFrame()
 	frame:SetResizable(true)
 	frame:SetFrameStrata("FULLSCREEN_DIALOG")
 	frame:SetToplevel(true)
+	frame:SetMinResize(300, 120)
 
 	frame:EnableMouse(true)
 	frame:SetScript('OnMouseDown', function(self)
@@ -290,22 +291,30 @@ local function CreateOurFrame()
 	})
 	background:SetBackdropColor(0,0,0,0.9)
 	background:SetBackdropBorderColor(1,1,1,1)
-	local MIN_ALPHA, ALPHA_DELAY = 0.1, 0.25
-	local function MaxOpacity()
-		return not db.profile.autoFadeOut or frame.movingOrSizing or frame:IsMouseOver()
+	local ALPHA_DELAY = 0.25
+	local function GetOpacitySettings()
+		if db.profile.autoFadeOut then
+			return frame.movingOrSizing or frame:IsMouseOver(), db.profile.opacity, 0.95
+		else
+			return true, 0.1, db.profile.opacity
+		end
 	end
 	background:SetScript('OnUpdate', function(self, elapsed)
 		local alpha, newAlpha = self:GetAlpha()
-		if MaxOpacity() then
-			newAlpha = min(db.profile.maxOpacity, alpha + elapsed / ALPHA_DELAY)
+		local goMax, minAlpha, maxAlpha = GetOpacitySettings()
+		if goMax then
+			newAlpha = min(maxAlpha, alpha + (maxAlpha - minAlpha) * elapsed / ALPHA_DELAY)
 		else
-			newAlpha = max(MIN_ALPHA, alpha - elapsed / ALPHA_DELAY)
+			newAlpha = max(minAlpha, alpha - (maxAlpha - minAlpha) * elapsed / ALPHA_DELAY)
 		end
 		if newAlpha ~= alpha then
 			self:SetAlpha(newAlpha)
 		end
 	end)
-	background:SetScript('OnShow', function(self) self:SetAlpha(MaxOpacity() and db.profile.maxOpacity or MIN_ALPHA) end)
+	background:SetScript('OnShow', function(self)
+		local goMax, minAlpha, maxAlpha = GetOpacitySettings()
+		self:SetAlpha(goMax and maxAlpha or minAlpha) 
+	end)
 
 	local closeButton = CreateFrame("Button", nil, background, "UIPanelCloseButton")
 	closeButton:SetPoint("TOPRIGHT")
@@ -387,10 +396,10 @@ local function CreateOurFrame()
 	opacitySlider:SetThumbTexture([[Interface\Buttons\UI-SliderBar-Button-Horizontal]])
 	opacitySlider:SetPoint("TOPRIGHT", -64, -8)
 	opacitySlider:SetValueStep(0.05)
-	opacitySlider:SetMinMaxValues(0.2, 1.0)
-	opacitySlider:SetValue(db.profile.maxOpacity)
-	opacitySlider:SetScript('OnValueChanged', function(_, value) db.profile.maxOpacity = value end)
-	AttachTooltip(opacitySlider, "Frame opacity\nAdjust maximal frame opacity.")
+	opacitySlider:SetMinMaxValues(0.1, 0.95)
+	opacitySlider:SetValue(db.profile.opacity)
+	opacitySlider:SetScript('OnValueChanged', function(_, value) db.profile.opacity = value end)
+	AttachTooltip(opacitySlider, "Frame opacity\nAdjust the frame opacity.\nThis is the lowest opacity if auto fading is enabled else it is the frame opacity.")
 
 	frame:SetScript('OnShow', UpdateScrollBar)
 end

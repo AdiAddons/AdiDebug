@@ -107,22 +107,6 @@ function AdiDebug:GetSink(key)
 	return sinkFuncs[key]
 end
 
-local function GuessName(target)
-	if type(target[0]) == "userdata" then
-		return target:GetName()
-	end
-	local AceAddon = LibStub('AceAddon-3.0', true)
-	if AceAddon then
-		for addonName, addonTable in AceAddon:IterateAddons() do
-			if target == addonTable then
-				return addonName
-			end
-		end
-	end
-	return (type(target.GetName) == "function" and target:GetName())
-		or target.name
-end
-
 function AdiDebug:Embed(target, key)
 	assert(type(target) == "table", "AdiDebug:Embed(target[, key]): target should be a table.")
 	assert(type(key) == "string", "AdiDebug:Embed(target[, key]): key should be a string.")

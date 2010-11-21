@@ -13,9 +13,6 @@ local frame, messageArea, selector, scrollBar, currentNow
 local safetyLock
 
 local function UpdateScrollBar()
-	if GameTooltip:GetOwner() == messageArea then
-		GameTooltip:Hide()
-	end
 	if safetyLock then return end
 	local numMessages, displayed = messageArea:GetNumMessages(), messageArea:GetNumLinesDisplayed()
 	local newMax = max(0, numMessages - displayed)
@@ -40,9 +37,6 @@ end
 local function AddMessage(name, now, text)
 	if not db.profile.names[currentKey][name] then
 		return
-	end
-	if GameTooltip:GetOwner() == messageArea then
-		GameTooltip:Hide()
 	end
 	if now ~= currentNow then
 		messageArea:AddMessage(strjoin("", "----- ", date("%X", now), strsub(format("%.3f", now % 1), 2)), 0.6, 0.6, 0.6)
@@ -113,8 +107,8 @@ local function ShowTableTooltip(value)
 end
 
 local function OnHyperlinkClick(self, data, link)
-	GameTooltip:ClearLines()
 	GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
+	GameTooltip:ClearLines()
 	local linkType, linkData = strsplit(':', data, 2)
 	local ownLink = strmatch(linkType, '^AdiDebug(%w+)$')
 	if ownLink then
@@ -136,8 +130,8 @@ local function OnHyperlinkClick(self, data, link)
 end
 
 local function OnHyperlinkEnter(self, data, link)
-	GameTooltip:ClearLines()
 	GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
+	GameTooltip:ClearLines()
 	GameTooltip:AddLine(link)
 	local linkType, linkData = strsplit(':', data, 2)
 	local ownLink = strmatch(linkType, '^AdiDebug(%w+)$')

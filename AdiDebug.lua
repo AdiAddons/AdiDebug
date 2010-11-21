@@ -9,6 +9,10 @@ local addonName, ns = ...
 local AdiDebug = CreateFrame("Frame", "AdiDebug")
 AdiDebug.version = GetAddOnMetadata(addonName, "version")
 
+local type, tostring, format = type, tostring, format
+local pcall, select, time = pcall, select, time
+local tinsert, tremove, tconcat = tinsert, tremove, table.concat
+
 local now = time()
 local messages = {}
 local names = {}
@@ -58,7 +62,7 @@ do
 			local v = select(i, ...)
 			t[i] = type(v) == "string" and v or PrettyFormat(v)
 		end
-		return table.concat(t, " ", 1, n)
+		return tconcat(t, " ", 1, n)
 	end
 end
 

@@ -225,10 +225,10 @@ local function ShowFrameAttribute(self, getterName)
 	else
 		label = strmatch(getterName, "^Get(%w+)$") or getterName
 	end
-	GameTooltip:AddDoubleLine(label, AdiDebug:PrettyFormat(value))
+	GameTooltip:AddDoubleLine(label, AdiDebug:PrettyFormat(value, true))
 end
 
-local function ShowFrameTooltip(self)
+local function ShowUIObjectTooltip(self)
 	ShowFrameAttribute(self, "GetObjectType")
 	ShowFrameAttribute(self, "GetParent")
 	ShowFrameAttribute(self, "IsProtected")
@@ -273,19 +273,13 @@ end
 local function Messages_OnHyperlinkClick(self, data, link)
 	GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
 	GameTooltip:ClearLines()
-	local linkType, linkData = strsplit(':', data, 2)
-	local ownLink = strmatch(linkType, '^AdiDebug(%w+)$')
-	if ownLink then
-		GameTooltip:AddDoubleLine(ownLink, link)
-		local value = AdiDebug:GetTableHyperlinkTable(link)
-		if value then
-			if ownLink == "Table" then
-				ShowTableTooltip(value)
-			else
-				ShowFrameTooltip(value)
-			end
+	local t, tableType = AdiDebug:GetTableHyperlinkTable(link)
+	if t then
+		GameTooltip:AddDoubleLine(link, tableType)
+		if tableType == "table" then
+			ShowTableTooltip(t)
 		else
-			GameTooltip:AddLine("Has been collected")
+			ShowUIObjectTooltip(t)
 		end
 	else
 		GameTooltip:SetHyperlink(link)
@@ -297,14 +291,11 @@ local function Messages_OnHyperlinkEnter(self, data, link)
 	GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
 	GameTooltip:ClearLines()
 	GameTooltip:AddLine(link)
+	local _, tableType = AdiDebug:GetTableHyperlinkTable(link)
 	local linkType, linkData = strsplit(':', data, 2)
-	local ownLink = strmatch(linkType, '^AdiDebug(%w+)$')
-	if ownLink then
-		GameTooltip:AddDoubleLine("Type:", ownLink)
-	else
-		GameTooltip:AddDoubleLine("Type:", linkType)
-	end
-	GameTooltip:AddDoubleLine("Data:", linkData)
+	GameTooltip:AddDoubleLine("Link type", tableType or linkType)
+	GameTooltip:AddDoubleLine("Link data", linkData)
+	GameTooltip:AddLine("|cffaaaaaaClick for more details.|r")
 	GameTooltip:Show()
 end
 

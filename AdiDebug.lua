@@ -21,13 +21,16 @@ local tinsert, tremove, tconcat = tinsert, tremove, table.concat
 -- Color scheme
 -- ----------------------------------------------------------------------------
 
+--- Colors used in type coloring.
+-- Keys are value returned by AdiDebug:GetSmartType().
+-- Values are the color in "rrggbb" form.
 AdiDebug.hexColors = {
 	["nil"]      = "aaaaaa",
 	["boolean"]  = "77aaff",
 	["number"]   = "aa77ff",
 	["table"]    = "44ffaa",
 	["UIObject"] = "ffaa44",
-	-- ["function"] =
+	["function"] = "77ffff",
 	-- ["userdata"] =
 }
 
@@ -51,43 +54,47 @@ end
 -- Safely get name for tables
 -- ----------------------------------------------------------------------------
 
-local function GuessTableName(value)
+local function GuessTableName(t)
 	return
-		(type(value.GetName) == "function" and value:GetName())
-		or (type(value.ToString) == "function" and value:ToString())
-		or value.name
+		(type(t.GetName) == "function" and t:GetName())
+		or (type(t.ToString) == "function" and t:ToString())
+		or t.name
 end
 
-local function GetRawTableName(value)
-	local mt = getmetatable(value)
-	setmetatable(value, nil)
-	local name = gsub(tostring(value), 'table: ', '')
-	setmetatable(value, mt)
+local function GetRawTableName(t)
+	local mt = getmetatable(t)
+	setmetatable(t, nil)
+	local name = gsub(tostring(t), '^table: ', '')
+	setmetatable(t, mt)
 	return name
 end
 
 local tableNameCache = setmetatable({}, {
 	__mode = 'k',
-	__index = function(self, value)
-		local name = safecall(GuessTableName, value)
-		if not name then
-			name = GetRawTableName(value)
-		end
-		self[value] = name
+	__index = function(self, t)
+		local name = safecall(GuessTableName, t) or GetRawTableName(t)
+		self[t] = name
 		return name
 	end
 })
 
----
-function AdiDebug:GetTableName(value)
-	return type(value) == "table" and tableNameCache[value] or tostring(value)
+--- Get an human-readable name for a table, which could be an object or an UIObject.
+-- First try to use :GetName() and :ToString() methods, if they exist.
+-- Then try to get the name field.
+-- As a last resort, returns the hexadecimal part of tostring(t).
+-- @param t The table to examine.
+-- @return A table name, hopefully human-readable.
+function AdiDebug:GetTableName(t)
+	return type(t) == "table" and tableNameCache[t] or tostring(t)
 end
 
 -- ----------------------------------------------------------------------------
 -- Table/frame hyperlink builder
 -- ----------------------------------------------------------------------------
 
----
+--- Enhanced version of the built-in type() function that detects Blizzard's UIObject.
+-- @param value The value to examine.
+-- @return Either type(value) or "UIObject"
 function AdiDebug:GetSmartType(value)
 	local t = type(value)
 	if t == "table" and type(t[0]) == "userdata" then
@@ -100,37 +107,48 @@ end
 -- Table/frame hyperlink builder
 -- ----------------------------------------------------------------------------
 
-local function BuildHyperLink(value)
-	local name, valueType = AdiDebug:GetTableName(value), AdiDebug:SmartType(value)
+local function BuildHyperLink(t)
+	local name, valueType = AdiDebug:GetTableName(t), AdiDebug:GetSmartType(t)
 	return format("|cff%s|HAdiDebug%s:%s|h[%s]|h|r", AdiDebug.hexColors[valueType], valueType, name, name)
 end
 
 local linkRefs = setmetatable({}, {__mode = 'v'})
 local linkCache = setmetatable({}, {
 	__mode = 'k',
-	__index = function(self, value)
-		local link = BuildHyperLink(value)
-		linkRefs[link] = value
-		self[value] = link
+	__index = function(self, t)
+		local link = BuildHyperLink(t)
+		linkRefs[link] = t
+		self[t] = link
 		return link
 	end
 })
 
----
-function AdiDebug:GetTableHyperlink(value)
-	return type(value) == "table" and linkCache[value] or tostring(value)
+--- Build an hyperlink for a table.
+-- @param t The table.
+-- @return An hyperlink, suitable to be used in any FontString.
+function AdiDebug:GetTableHyperlink(t)
+	return type(t) == "table" and linkCache[t] or tostring(t)
 end
 
----
+--- Returns the table associated to an table hyperlink.
+-- @param link The table hyperlink.
+-- @return table, linkType: the table or nil if it has been collected, and the subtype of table: "table" or "UIObject".
 function AdiDebug:GetTableHyperlinkTable(link)
-	return link and linkRefs[link]
+	local t = link and linkRefs[link]
+	if t then
+		return t, strmatch(link, 'AdiDebug(%w+):')
+	end
 end
 
 -- ----------------------------------------------------------------------------
 -- Pretty formatting
 -- ----------------------------------------------------------------------------
 
----
+--- Convert an Lua value into a color, human-readable representation.
+-- @param value The value to represent.
+-- @param noLink Do not return hyperlinks for tables if true ; defaults to false.
+-- @param noTableName Do no return human-readable name for table if true ; defaults to false.
+-- @return An human-readable representation of the value.
 function AdiDebug:PrettyFormat(value, noLink, noTableName)
 	local str
 	if type(value) == "table" then
@@ -146,7 +164,7 @@ function AdiDebug:PrettyFormat(value, noLink, noTableName)
 	end
 	local color = self.hexColors[self:GetSmartType(value)]
 	if color then
-		return format("|cff%s%s|r", color, str)
+		return strjoin('', '|cff', color, str, '|r')
 	else
 		return str
 	end
@@ -172,7 +190,7 @@ function AdiDebug:HasKey(key)
 end
 
 --- Provides an iterator for the registered stream keys.
--- @return Suitable values for the "in" part of an "for ... in ... do" statement
+-- @return Suitable values for the "in" part of an "for ... in ... do" statement.
 -- @usage
 -- for key in AdiDebug:IterateKeys() do
 --   -- Do something usefull with key
@@ -183,14 +201,14 @@ end
 
 --- Tests is sub-keys have been defined for a given stream key.
 -- @param key The stream key to examine.
--- @return True if sub-keys exists for that stream key
+-- @return True if sub-keys exists for that stream key.
 function AdiDebug:HasSubKeys(key)
 	return not not next(subKeys[key])
 end
 
 --- Provides an iterator for the sub-keys of a given stream key.
 -- @param key The stream key.
--- @return Suitable values for the "in" part of an "for ... in ... do" statement
+-- @return Suitable values for the "in" part of an "for ... in ... do" statement.
 -- @usage
 -- for subKey in AdiDebug:IterateSubKeys("test") do
 --   -- Do something usefull with subKey
@@ -211,9 +229,9 @@ end
 -- @param key The stream key.
 -- @return Suitable values for the "in" part of an "for ... in ... do" statement
 -- @usage
--- for index, subKey, timestamp, message in AdiDebug:IterateMessages("test") do
---   -- Do something meaningful with those value
--- end
+--   for index, subKey, timestamp, message in AdiDebug:IterateMessages("test") do
+--     -- Do something meaningful with those value
+--   end
 function AdiDebug:IterateMessages(key)
 	return messageIterator, messages[key], 0
 end
@@ -250,6 +268,8 @@ local function Format(...)
 end
 
 local function Sink(key, subKey, ...)
+	assert(key)
+	assert(subKey)
 	local m = messages[key]
 	local t = tremove(heap, 1)
 	local text = Format(...)
@@ -285,14 +305,18 @@ local function RegisterKey(key)
 end
 
 local sinkFuncs = setmetatable({}, { __index = function(self, key)
-	local sink = function(...) return safecall(Sink, key, key, ...) end
+	local sink = function(...)
+		return safecall(Sink, key, key, ...)
+	end
 	self[key] = sink
 	RegisterKey(key)
 	return sink
 end})
 
 local sinkMethods = setmetatable({}, { __index = function(self, key)
-	local sink = function(self, ...) return safecall(Sink, key, AdiDebug:GetTableName(self), self, ...) end
+	local sink = function(obj, ...)
+		return safecall(Sink, key, AdiDebug:GetTableName(obj), obj, ...)
+	end
 	self[key] = sink
 	RegisterKey(key)
 	return sink

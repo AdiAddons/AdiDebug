@@ -34,8 +34,8 @@ local function UpdateScrollBar()
 	end
 end
 
-local function AddMessage(name, now, text)
-	if not db.profile.names[currentKey][name] then
+local function AddMessage(subKey, now, text)
+	if not db.profile.subKeys[currentKey][subKey] then
 		return
 	end
 	if now ~= currentNow then
@@ -49,9 +49,8 @@ local function RefreshMessages()
 	messageArea:Clear()
 	currentNow = nil
 	if currentKey then
-		local m = AdiDebug.messages[currentKey]
-		for i = 1, #m do
-			AddMessage(unpack(m[i]))
+		for i, subKey, now, text in AdiDebug:IterateMessages(currentKey) do
+			AddMessage(subKey, now, text)
 		end
 	end
 	UpdateScrollBar()
@@ -66,37 +65,43 @@ local function SelectKey(key)
 	end
 end
 
-local GetTableHyperlinkTable = AdiDebug.GetTableHyperlinkTable
-local PrettyFormat = AdiDebug.PrettyFormat
+local function ShowFrameAttribute(frame, getterName)
+	if not frame[getterName] then return end
+	local value = frame[getterName](frame)
+	local isBool, label = strmatch(getterName, "^(Is)(%w+)$")
+	if isBool then
+		value = not not value
+	else
+		label = strmatch(getterName, "^Get(%w+)$") or getterName
+	end
+	GameTooltip:AddDoubleLine(label, AdiDebug:PrettyFormat(value))
+end
 
 local function ShowFrameTooltip(frame)
-	GameTooltip:AddDoubleLine("Type:", PrettyFormat(frame:GetObjectType()))
-	GameTooltip:AddDoubleLine("Parent:", PrettyFormat(frame:GetParent()))
-	if frame:IsObjectType("Region") then
-		GameTooltip:AddDoubleLine("Protected:", PrettyFormat(not not frame:IsProtected()))
-		local top, bottom, width, height = frame:GetRect()
-		GameTooltip:AddDoubleLine("Bottom left:", format("%g,%g", top, bottom))
-		GameTooltip:AddDoubleLine("Size:", format("%g,%g", width, height))
-	end
-	if frame.GetAlpha and frame.IsShown and frame.IsVisible then -- Duck typing
-		GameTooltip:AddDoubleLine("Alpha:", PrettyFormat(frame:GetAlpha()))
-		GameTooltip:AddDoubleLine("Shown:", PrettyFormat(not not frame:IsShown()))
-		GameTooltip:AddDoubleLine("Visible:", PrettyFormat(not not frame:IsVisible()))
-	end
-	if frame:IsObjectType("Frame") then
-		GameTooltip:AddDoubleLine("Strata:", PrettyFormat(frame:GetFrameStrata()))
-		GameTooltip:AddDoubleLine("Level:", PrettyFormat(frame:GetFrameLevel()))
-	end
+	ShowFrameAttribute(frame, "GetObjectType")
+	ShowFrameAttribute(frame, "GetParent")
+	ShowFrameAttribute(frame, "IsProtected")
+
+	local top, bottom, width, height = frame:GetRect()
+	GameTooltip:AddDoubleLine("Bottom left:", format("%g,%g", top, bottom))
+	GameTooltip:AddDoubleLine("Size:", format("%g,%g", width, height))
+	
+	ShowFrameAttribute(frame, "GetAlpha")
+	ShowFrameAttribute(frame, "IsShown")
+	ShowFrameAttribute(frame, "IsVisible")
+
+	ShowFrameAttribute(frame, "GetFrameStrata")
+	ShowFrameAttribute(frame, "GetFrameLevel")
 end
 
 local function ShowTableTooltip(value)
 	local mt = getmetatable(value)
 	setmetatable(value, nil)
-	GameTooltip:AddDoubleLine("Metatable:", PrettyFormat(mt))
+	GameTooltip:AddDoubleLine("Metatable", AdiDebug:PrettyFormat(mt))
 	local n = 0
 	for k, v in pairs(value) do
 		if n < 10 then
-			GameTooltip:AddDoubleLine(PrettyFormat(k), PrettyFormat(v))
+			GameTooltip:AddDoubleLine(AdiDebug:PrettyFormat(k), AdiDebug:PrettyFormat(v))
 		end
 		n = n + 1
 	end
@@ -113,7 +118,7 @@ local function OnHyperlinkClick(self, data, link)
 	local ownLink = strmatch(linkType, '^AdiDebug(%w+)$')
 	if ownLink then
 		GameTooltip:AddDoubleLine(ownLink, link)
-		local value = GetTableHyperlinkTable(link)
+		local value = AdiDebug:GetTableHyperlinkTable(link)
 		if value then
 			if ownLink == "Table" then
 				ShowTableTooltip(value)
@@ -153,11 +158,11 @@ local function KeyEntry_OnClick(button)
 end
 
 local function NameEntry_IsChecked(button)
-	return db.profile.names[button.arg1][button.value]
+	return db.profile.subKeys[button.arg1][button.value]
 end
 
 local function NameEntry_OnClick(button, key, _, checked)
-	db.profile.names[button.arg1][button.value] = checked
+	db.profile.subKeys[button.arg1][button.value] = checked
 	if key == currentKey then
 		RefreshMessages()
 	end
@@ -180,7 +185,7 @@ local list = {}
 local function Selector_Initialize(frame, level, menuList)
 	wipe(list)
 	if level == 1 then
-		for key in pairs(AdiDebug.messages) do
+		for key in AdiDebug:IterateKeys() do
 			tinsert(list, key)
 		end
 		table.sort(list)
@@ -190,7 +195,7 @@ local function Selector_Initialize(frame, level, menuList)
 			opt.value = key
 			opt.func = KeyEntry_OnClick
 			opt.checked = KeyEntry_IsChecked
-			if next(AdiDebug.names[key]) then
+			if AdiDebug:HasSubKeys(key) then
 				opt.hasArrow = true
 			end
 
@@ -199,16 +204,16 @@ local function Selector_Initialize(frame, level, menuList)
 	elseif level == 2 then
 		local key = UIDROPDOWNMENU_MENU_VALUE
 
-		for name in pairs(AdiDebug.names[key]) do
-			tinsert(list, name)
+		for subKey in AdiDebug:IterateSubKeys(key) do
+			tinsert(list, subKey)
 		end
 		table.sort(list)
 		tinsert(list, 1, key)
 
-		for i, name in ipairs(list) do
+		for i, subKey in ipairs(list) do
 			local opt = UIDropDownMenu_CreateInfo()
-			opt.text = name
-			opt.value = name
+			opt.text = subKey
+			opt.value = subKey
 			opt.isNotRadio = true
 			opt.func = NameEntry_OnClick
 			opt.arg1 = key
@@ -232,11 +237,15 @@ local function CreateOurFrame()
 			yOffset = -200,
 			width = 640,
 			height = 400,
-			names = { ['*'] = { ['*'] = true } },
+			subKeys = { ['*'] = { ['*'] = true } },
 			autoFadeOut = false,
 			opacity = 0.95,
 		}
 	}, true)
+	if db.profile.names then
+		db.profile.subKeys = db.profile.names
+		db.profile.names = nil
+	end
 
 	frame = CreateFrame("Frame", "AdiDebugFrame", UIParent)
 	frame:Hide()
@@ -399,12 +408,12 @@ local function CreateOurFrame()
 	frame:SetScript('OnShow', UpdateScrollBar)
 end
 
-function AdiDebug:Callback(key, ...)
+AdiDebug.RegisterCallback("AdiDebug_GUI", "AdiDebug_NewMessage", function(event, key, subKey, now, text)
 	if key == currentKey then
-		AddMessage(...)
+		AddMessage(subKey, now, text)
 		UpdateScrollBar()
 	end
-end
+end)
 
 function AdiDebug:Open(arg)
 	if not frame then
@@ -427,4 +436,3 @@ function AdiDebug:Open(arg)
 end
 
 AdiDebug.LoadAndOpen = AdiDebug.Open
-

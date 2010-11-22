@@ -8,6 +8,7 @@
 ## X-Date: @project-date-iso@
 ## OptionalDeps: Ace3, tekDebug
 ## LoadOnDemand: 1
+## LoadWith: tekDebug
 
 #@no-lib-strip@
 libs\LibStub\LibStub.lua

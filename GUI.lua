@@ -260,19 +260,29 @@ local function Format(...)
 	return table.concat(t, ", ", 1, n)
 end
 
+local bools = {}
 local function ShowUIObjectTooltip(obj)
 	-- We're doing duck typing there
+	local haveBools = false
 	for i, getter in ipairs(getters) do
 		if type(obj[getter]) == "function" then
-			local value = obj[getter](obj)
 			local label = strmatch(getter, "^Is(%w+)$") or strmatch(getter, "^(Can%w+)$")
 			if label then
-				value = AdiDebug:PrettyFormat(not not value)
+				haveBools = true
+				if obj[getter](obj) then
+					tinsert(bools, label)
+				end
 			else
-				label = strmatch(getter, "^Get(%w+)$") or getter
-				value = Format(obj[getter](obj))
+				GameTooltip:AddDoubleLine(strmatch(getter, "^Get(%w+)$") or getter, Format(obj[getter](obj)))
 			end
-			GameTooltip:AddDoubleLine(label, value)
+		end
+	end
+	if haveBools then
+		if #bools > 0 then
+			GameTooltip:AddDoubleLine("Flags", table.concat(bools, ", "))
+			wipe(bools)
+		else
+			GameTooltip:AddDoubleLine("Flags", "-")
 		end
 	end
 end

@@ -225,26 +225,20 @@ local function ShowFrameAttribute(self, getterName)
 	else
 		label = strmatch(getterName, "^Get(%w+)$") or getterName
 	end
-	GameTooltip:AddDoubleLine(label, AdiDebug:PrettyFormat(value, true))
+	GameTooltip:AddDoubleLine(label, AdiDebug:PrettyFormat(value, true, 30))
 end
 
 local function ShowUIObjectTooltip(self)
 	ShowFrameAttribute(self, "GetObjectType")
 	ShowFrameAttribute(self, "GetParent")
 	ShowFrameAttribute(self, "IsProtected")
-
-	local top, bottom, width, height = self:GetRect()
-	if top and bottom then
-		GameTooltip:AddDoubleLine("Bottom left", format("%g, %g", top, bottom))
-	end
-	if width and height then
-		GameTooltip:AddDoubleLine("Size", format("%g, %g", width, height))
-	end
-
+	ShowFrameAttribute(self, "GetLeft")
+	ShowFrameAttribute(self, "GetBottom")
+	ShowFrameAttribute(self, "GetWidth")
+	ShowFrameAttribute(self, "GetHeight")
 	ShowFrameAttribute(self, "GetAlpha")
 	ShowFrameAttribute(self, "IsShown")
 	ShowFrameAttribute(self, "IsVisible")
-
 	ShowFrameAttribute(self, "GetFrameStrata")
 	ShowFrameAttribute(self, "GetFrameLevel")
 end
@@ -256,7 +250,7 @@ local function ShowTableTooltip(value)
 	local n = 0
 	for k, v in pairs(value) do
 		if n < 10 then
-			GameTooltip:AddDoubleLine(AdiDebug:PrettyFormat(k), AdiDebug:PrettyFormat(v))
+			GameTooltip:AddDoubleLine(AdiDebug:PrettyFormat(k, true, 30), AdiDebug:PrettyFormat(v, true, 30))
 		end
 		n = n + 1
 	end
@@ -431,6 +425,7 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 	messages:SetScript('OnHyperlinkClick', Messages_OnHyperlinkClick)
 	messages:SetScript('OnHyperlinkEnter', Messages_OnHyperlinkEnter)
 	messages:SetScript('OnHyperlinkLeave', GameTooltip_Hide)
+	messages:SetScript('OnLeave', GameTooltip_Hide)
 	messages:SetScript('OnMouseWheel', Messages_OnMouseWheel)
 	self.Messages = messages
 

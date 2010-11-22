@@ -27,11 +27,11 @@ local tinsert, tremove, tconcat = tinsert, tremove, table.concat
 AdiDebug.hexColors = {
 	["nil"]      = "aaaaaa",
 	["boolean"]  = "77aaff",
-	["number"]   = "aa77ff",
+	["number"]   = "ff77ff",
 	["table"]    = "44ffaa",
 	["UIObject"] = "ffaa44",
 	["function"] = "77ffff",
-	-- ["userdata"] =
+	["string"]   = "ffffff",
 }
 
 -- ----------------------------------------------------------------------------
@@ -97,7 +97,7 @@ end
 -- @return Either type(value) or "UIObject"
 function AdiDebug:GetSmartType(value)
 	local t = type(value)
-	if t == "table" and type(t[0]) == "userdata" then
+	if t == "table" and type(value[0]) == "userdata" then
 		return "UIObject"
 	end
 	return t
@@ -147,27 +147,25 @@ end
 --- Convert an Lua value into a color, human-readable representation.
 -- @param value The value to represent.
 -- @param noLink Do not return hyperlinks for tables if true ; defaults to false.
--- @param noTableName Do no return human-readable name for table if true ; defaults to false.
+-- @param maxLength The maximum length of the value ; defaults to no limit.
 -- @return An human-readable representation of the value.
-function AdiDebug:PrettyFormat(value, noLink, noTableName)
-	local str
-	if type(value) == "table" then
+function AdiDebug:PrettyFormat(value, noLink, maxLength)
+	local valueType = self:GetSmartType(value)
+	local color = self.hexColors[valueType] or ('ff0000'..valueType..':')
+	if valueType == "table" or valueType == "UIObject" then
 		if not noLink then
 			return self:GetTableHyperlink(value)
-		elseif noTableName then
-			str = '['..self:GetTableName(value)..']'
 		else
-			str = '['..GetRawTableName(value)..']'
+			return strjoin('', '|cff', color, self:GetTableName(value), '|r')
 		end
-	else
-		str = tostring(value)
+	elseif valueType == "number" and maxLength then
+		return strjoin('', '|cff', color, strtrim(format('%'..maxLength..'g', value)), '|r')
 	end
-	local color = self.hexColors[self:GetSmartType(value)]
-	if color then
-		return strjoin('', '|cff', color, str, '|r')
-	else
-		return str
+	local	str = tostring(value)
+	if maxLength and strlen(str) > maxLength then
+		str = strsub(str, 1, maxLength-3) .. '|cffaaaaaa...|r'
 	end
+	return strjoin('', '|cff', color, str, '|r')
 end
 
 -- ----------------------------------------------------------------------------

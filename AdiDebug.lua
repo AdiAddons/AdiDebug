@@ -131,7 +131,7 @@ function AdiDebug:HasKey(key)
 	return not not messages[key]
 end
 
-function AdiDebug:IterateKeys() 
+function AdiDebug:IterateKeys()
 	return keyIterator
 end
 
@@ -139,7 +139,7 @@ function AdiDebug:HasSubKeys(key)
 	return not not next(subKeys[key])
 end
 
-function AdiDebug:IterateSubKeys(key) 
+function AdiDebug:IterateSubKeys(key)
 	return pairs(subKeys[key])
 end
 
@@ -196,7 +196,7 @@ local function Sink(key, subKey, ...)
 		t[1], t[2], t[3] = subKey, now, text
 	end
 	tinsert(m, t)
-	for i = 500, #m do	
+	for i = 500, #m do
 		tinsert(heap, tremove(m, 1))
 	end
 	if subKey ~= key and not subKeys[key][subKey] then

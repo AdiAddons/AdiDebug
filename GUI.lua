@@ -1,31 +1,36 @@
 --[[
-AdiDebug - Adirelle's debug frame.
+AdiDebug - Adirelle's debug self.
 Copyright 2010 Adirelle (adirelle@tagada-team.net)
 All rights reserved.
 --]]
 
-local db
+local addonName = ...
+local AdiDebugGUI = CreateFrame("Frame", "AdiDebugGUI", UIParent)
+AdiDebugGUI:Hide()
 
-local currentKey
+local AdiDebug = AdiDebug
 
-local frame, messageArea, selector, scrollBar, currentNow
+local ALPHA_DELAY = 0.25
 
-local safetyLock
+-- ----------------------------------------------------------------------------
+-- Scroll bar and message handling
+-- ----------------------------------------------------------------------------
 
-local function UpdateScrollBar()
-	if safetyLock then return end
-	local numMessages, displayed = messageArea:GetNumMessages(), messageArea:GetNumLinesDisplayed()
+function AdiDebugGUI:UpdateScrollBar()
+	if self.safetyLock then return end
+	local numMessages, displayed = self.Messages:GetNumMessages(), self.Messages:GetNumLinesDisplayed()
 	local newMax = max(0, numMessages - displayed)
+	local scrollBar = self.ScrollBar
 	if newMax > 0 then
-		safetyLock = true
+		self.safetyLock = true
 		if newMax ~= select(2, scrollBar:GetMinMaxValues()) then
 			scrollBar:SetMinMaxValues(0, newMax)
 		end
-		local offset = max(0, newMax - messageArea:GetCurrentScroll())
-		if offset ~= scrollBar:GetValue() then
+		local offset = max(0, newMax - self.Messages:GetCurrentScroll())
+		if offset ~=scrollBar:GetValue() then
 			scrollBar:SetValue(offset)
 		end
-		safetyLock = false
+		self.safetyLock = false
 		if not scrollBar:IsShown() then
 			scrollBar:Show()
 		end
@@ -34,40 +39,186 @@ local function UpdateScrollBar()
 	end
 end
 
-local function AddMessage(subKey, now, text)
-	if not db.profile.subKeys[currentKey][subKey] then
+function AdiDebugGUI:SetVerticalScroll(value)
+	if self.safetyLock then return end
+	local _, maxVal = self.ScrollBar:GetMinMaxValues()
+	local offset = maxVal - value
+	if self.Messages:GetCurrentScroll() ~= offset then
+		self.safetyLock = true
+		self.Messages:SetScrollOffset(offset)
+		self.safetyLock = false
+	end
+end
+
+function AdiDebugGUI:AddMessage(subKey, timestamp, text)
+	if not self.db.profile.subKeys[self.currentKey][subKey] then
 		return
 	end
-	if now ~= currentNow then
-		messageArea:AddMessage(strjoin("", "----- ", date("%X", now), strsub(format("%.3f", now % 1), 2)), 0.6, 0.6, 0.6)
-		currentNow = now
+	if timestamp ~= self.currentTimestamp then
+		self.Messages:AddMessage(strjoin("", "----- ", date("%X", timestamp), strsub(format("%.3f", timestamp % 1), 2)), 0.6, 0.6, 0.6)
+		self.currentTimestamp = timestamp
 	end
-	messageArea:AddMessage(text)
+	self.Messages:AddMessage(text)
 end
 
-local function RefreshMessages()
-	messageArea:Clear()
-	currentNow = nil
-	if currentKey then
-		for i, subKey, now, text in AdiDebug:IterateMessages(currentKey) do
-			AddMessage(subKey, now, text)
+function AdiDebugGUI:RefreshMessages()
+	self.Messages:Clear()
+	self.currentTimestamp = nil
+	if self.currentKey then
+		for i, subKey, now, text in AdiDebug:IterateMessages(self.currentKey) do
+			self:AddMessage(subKey, now, text)
 		end
 	end
-	UpdateScrollBar()
+	self:UpdateScrollBar()
 end
 
-local function SelectKey(key)
-	if currentKey ~= key then
-		currentKey = key
-		db.profile.key = currentKey
-		selector.text:SetText(currentKey or "")
-		RefreshMessages()
+function AdiDebugGUI:SelectKey(key)
+	if not AdiDebug:HasKey(key) then return end
+	self.db.profile.key = key
+	if key == self.currentKey then return end
+	self.currentKey = key
+	self.Selector.Text:SetText(key or "")
+	self:RefreshMessages()
+	return true
+end
+
+-- ----------------------------------------------------------------------------
+-- Selector menu handling
+-- ----------------------------------------------------------------------------
+
+local keyEntryMeta = { __index = {
+	checked = function(button)
+		return AdiDebugGUI.currentKey and button.value == AdiDebugGUI.currentKey
+	end,
+	func = function(button)
+		AdiDebugGUI:SelectKey(button.value)
+	end,
+}}
+
+local subKeyEntryMeta = { __index = {
+	isNotRadio = true,
+	keepShownOnClick = true,
+	checked = function(button)
+		return AdiDebugGUI.db.profile.subKeys[button.arg1][button.value]
+	end,
+	func = function(button, key, _, checked)
+		AdiDebugGUI.db.profile.subKeys[button.arg1][button.value] = checked
+		if key == AdiDebugGUI.currentKey then
+			AdiDebugGUI:RefreshMessages()
+		end
+	end,
+}}
+
+local closeEntry = {
+	text = "Close menu",
+	notCheckable = true,
+}
+
+local function SortEntries(a, b) -- a < b
+	if b == closeEntry then
+		return true
+	elseif a == closeEntry then
+		return false
+	else
+		return a.text < b.text
 	end
 end
 
-local function ShowFrameAttribute(frame, getterName)
-	if not frame[getterName] then return end
-	local value = frame[getterName](frame)
+function AdiDebugGUI:AddMenuKeyEntry(key)
+	local entry = setmetatable({
+		text = key,
+		value = key,
+	}, keyEntryMeta)
+	self.menuKeyEntries[key] = entry
+	tinsert(self.menuList, entry)
+	table.sort(self.menuList, SortEntries)
+end
+
+function AdiDebugGUI:AddMenuSubKeyEntry(key, subKey)
+	local keyEntry = self.menuKeyEntries[key]
+	if not keyEntry.menuList then
+		keyEntry.menuList = { closeEntry }
+	else
+		keyEntry.hasArrow = true
+	end
+	local entry = setmetatable({
+		text = subKey,
+		value = subKey,
+		arg1 = key,
+	}, subKeyEntryMeta)
+	tinsert(keyEntry.menuList, entry)
+	table.sort(keyEntry.menuList, SortEntries)
+end
+
+-- ----------------------------------------------------------------------------
+-- AdiDebug callback handlers
+-- ----------------------------------------------------------------------------
+
+function AdiDebugGUI:AdiDebug_NewKey(event, key)
+	self:AddMenuKeyEntry(key)
+	if not self.currentKey and key == self.db.profile.key then
+		self:SelectKey(key)
+	end
+end
+
+function AdiDebugGUI:AdiDebug_NewSubKey(event, key, subKey)
+	self:AddMenuSubKeyEntry(key, subKey)
+end
+
+function AdiDebugGUI:AdiDebug_NewMessage(event, key, subKey, now, text)
+	if key == self.currentKey then
+		self:AddMessage(subKey, now, text)
+		self:UpdateScrollBar()
+	end
+end
+
+-- ----------------------------------------------------------------------------
+-- Script handlers
+-- ----------------------------------------------------------------------------
+
+function AdiDebugGUI:OnMouseDown()
+	if not self.movingOrSizing and IsShiftKeyDown() then
+		local x, y = GetCursorPosition()
+		local scale = self:GetEffectiveScale()
+		local left, bottom, width, height = self:GetRect()
+		x, y = (x / scale) - left, (y / scale) - bottom
+		local horiz = (x < 16) and "LEFT" or (x > width - 16) and "RIGHT"
+		local vert = (y < 16) and "BOTTOM" or (y > height - 16) and "TOP"
+		if horiz or vert then
+			self:StartSizing(strjoin("", vert or "", horiz or ""))
+		else
+			self:StartMoving()
+		end
+		self.movingOrSizing = true
+	end
+end
+
+function AdiDebugGUI:OnMouseUp()
+	if self.movingOrSizing then
+		self.movingOrSizing = nil
+		self:StopMovingOrSizing()
+		self.db.profile.width, self.db.profile.height = self:GetSize()
+		local _
+		_, _, self.db.profile.point, self.db.profile.xOffset, self.db.profile.yOffset = self:GetPoint()
+	end
+end
+
+function AdiDebugGUI:OnShow()
+	self.db.profile.shown = true
+	self:UpdateScrollBar()
+end
+
+function AdiDebugGUI:OnHide()
+	self.db.profile.shown = false
+end
+
+-- ----------------------------------------------------------------------------
+-- Frame/table tooltips
+-- ----------------------------------------------------------------------------
+
+local function ShowFrameAttribute(self, getterName)
+	if not self[getterName] then return end
+	local value = self[getterName](self)
 	local isBool, label = strmatch(getterName, "^(Is)(%w+)$")
 	if isBool then
 		value = not not value
@@ -77,21 +228,25 @@ local function ShowFrameAttribute(frame, getterName)
 	GameTooltip:AddDoubleLine(label, AdiDebug:PrettyFormat(value))
 end
 
-local function ShowFrameTooltip(frame)
-	ShowFrameAttribute(frame, "GetObjectType")
-	ShowFrameAttribute(frame, "GetParent")
-	ShowFrameAttribute(frame, "IsProtected")
+local function ShowFrameTooltip(self)
+	ShowFrameAttribute(self, "GetObjectType")
+	ShowFrameAttribute(self, "GetParent")
+	ShowFrameAttribute(self, "IsProtected")
 
-	local top, bottom, width, height = frame:GetRect()
-	GameTooltip:AddDoubleLine("Bottom left:", format("%g,%g", top, bottom))
-	GameTooltip:AddDoubleLine("Size:", format("%g,%g", width, height))
-	
-	ShowFrameAttribute(frame, "GetAlpha")
-	ShowFrameAttribute(frame, "IsShown")
-	ShowFrameAttribute(frame, "IsVisible")
+	local top, bottom, width, height = self:GetRect()
+	if top and bottom then
+		GameTooltip:AddDoubleLine("Bottom left", format("%g, %g", top, bottom))
+	end
+	if width and height then
+		GameTooltip:AddDoubleLine("Size", format("%g, %g", width, height))
+	end
 
-	ShowFrameAttribute(frame, "GetFrameStrata")
-	ShowFrameAttribute(frame, "GetFrameLevel")
+	ShowFrameAttribute(self, "GetAlpha")
+	ShowFrameAttribute(self, "IsShown")
+	ShowFrameAttribute(self, "IsVisible")
+
+	ShowFrameAttribute(self, "GetFrameStrata")
+	ShowFrameAttribute(self, "GetFrameLevel")
 end
 
 local function ShowTableTooltip(value)
@@ -111,7 +266,11 @@ local function ShowTableTooltip(value)
 	setmetatable(value, mt)
 end
 
-local function OnHyperlinkClick(self, data, link)
+-- ----------------------------------------------------------------------------
+-- Widget script handlers
+-- ----------------------------------------------------------------------------
+
+local function Messages_OnHyperlinkClick(self, data, link)
 	GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
 	GameTooltip:ClearLines()
 	local linkType, linkData = strsplit(':', data, 2)
@@ -134,7 +293,7 @@ local function OnHyperlinkClick(self, data, link)
 	GameTooltip:Show()
 end
 
-local function OnHyperlinkEnter(self, data, link)
+local function Messages_OnHyperlinkEnter(self, data, link)
 	GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
 	GameTooltip:ClearLines()
 	GameTooltip:AddLine(link)
@@ -149,23 +308,42 @@ local function OnHyperlinkEnter(self, data, link)
 	GameTooltip:Show()
 end
 
-local function KeyEntry_IsChecked(button)
-	return currentKey and button.value == currentKey
-end
-
-local function KeyEntry_OnClick(button)
-	SelectKey(button.value)
-end
-
-local function NameEntry_IsChecked(button)
-	return db.profile.subKeys[button.arg1][button.value]
-end
-
-local function NameEntry_OnClick(button, key, _, checked)
-	db.profile.subKeys[button.arg1][button.value] = checked
-	if key == currentKey then
-		RefreshMessages()
+local function Messages_OnMouseWheel(self, delta)
+	local num, displayed = self:GetNumMessages(), self:GetNumLinesDisplayed()
+	local step = IsShiftKeyDown() and num or IsControlKeyDown() and displayed or 1
+	local current = self:GetCurrentScroll()
+	local newOffset = min(max(0, current + step * delta), num - displayed)
+	if newOffset ~= current then
+		self:SetScrollOffset(newOffset)
+		AdiDebugGUI:UpdateScrollBar()
 	end
+end
+
+local function Background_GetSettings()
+	local settings = AdiDebugGUI.db.profile
+	if settings.autoFadeOut then
+		return AdiDebugGUI.movingOrSizing or AdiDebugGUI:IsMouseOver(), settings.opacity, 0.95
+	else
+		return true, 0.1, settings.opacity
+	end
+end
+
+local function Background_OnUpdate(self, elapsed)
+	local alpha, newAlpha = self:GetAlpha()
+	local goMax, minAlpha, maxAlpha = Background_GetSettings()
+	if goMax then
+		newAlpha = min(maxAlpha, alpha + (maxAlpha - minAlpha) * elapsed / ALPHA_DELAY)
+	else
+		newAlpha = max(minAlpha, alpha - (maxAlpha - minAlpha) * elapsed / ALPHA_DELAY)
+	end
+	if newAlpha ~= alpha then
+		self:SetAlpha(newAlpha)
+	end
+end
+
+local function Background_OnShow(self)
+	local goMax, minAlpha, maxAlpha = Background_GetSettings()
+	self:SetAlpha(goMax and maxAlpha or minAlpha)
 end
 
 local function ShowTooltipText(self)
@@ -175,119 +353,31 @@ local function ShowTooltipText(self)
 	GameTooltip:Show()
 end
 
-local function AttachTooltip(target, text)
-	target.tooltipText = text
-	target:SetScript('OnEnter', ShowTooltipText)
-	target:SetScript('OnLeave', GameTooltip_Hide)
-end
+-- ----------------------------------------------------------------------------
+-- GUI initialization
+-- ----------------------------------------------------------------------------
 
-local list = {}
-local function Selector_Initialize(frame, level, menuList)
-	wipe(list)
-	if level == 1 then
-		for key in AdiDebug:IterateKeys() do
-			tinsert(list, key)
-		end
-		table.sort(list)
-		for i, key in ipairs(list) do
-			local opt = UIDropDownMenu_CreateInfo()
-			opt.text = key
-			opt.value = key
-			opt.func = KeyEntry_OnClick
-			opt.checked = KeyEntry_IsChecked
-			if AdiDebug:HasSubKeys(key) then
-				opt.hasArrow = true
-			end
+AdiDebugGUI:SetScript('OnShow', function(self)
 
-			UIDropDownMenu_AddButton(opt, level)
-		end
-	elseif level == 2 then
-		local key = UIDROPDOWNMENU_MENU_VALUE
+	self:SetSize(self.db.profile.width, self.db.profile.height)
+	self:SetPoint(self.db.profile.point, self.db.profile.xOffset, self.db.profile.yOffset)
+	self:SetClampedToScreen(true)
+	self:SetClampRectInsets(4,-4,-4,4)
+	self:SetMovable(true)
+	self:SetResizable(true)
+	self:SetFrameStrata("FULLSCREEN_DIALOG")
+	self:SetToplevel(true)
+	self:SetMinResize(300, 120)
+	self:EnableMouse(true)
+	self:SetScript('OnMouseDown', self.OnMouseDown)
+	self:SetScript('OnMouseUp', self.OnMouseUp)
+	self:SetScript('OnShow', self.OnShow)
+	self:SetScript('OnHide', self.OnHide)
 
-		for subKey in AdiDebug:IterateSubKeys(key) do
-			tinsert(list, subKey)
-		end
-		table.sort(list)
-		tinsert(list, 1, key)
+	----- Background -----
 
-		for i, subKey in ipairs(list) do
-			local opt = UIDropDownMenu_CreateInfo()
-			opt.text = subKey
-			opt.value = subKey
-			opt.isNotRadio = true
-			opt.func = NameEntry_OnClick
-			opt.arg1 = key
-			opt.checked = NameEntry_IsChecked
-			opt.keepShownOnClick = true
-			UIDropDownMenu_AddButton(opt, level)
-		end
-	end
-
-	local opt = UIDropDownMenu_CreateInfo()
-	opt.text = "Close menu"
-	opt.notCheckable = true
-	UIDropDownMenu_AddButton(opt, level)
-end
-
-local function CreateOurFrame()
-	db = AdiDebug.db:RegisterNamespace("GUI", {
-		profile = {
-			point = "TOPLEFT",
-			xOffset = 16,
-			yOffset = -200,
-			width = 640,
-			height = 400,
-			subKeys = { ['*'] = { ['*'] = true } },
-			autoFadeOut = false,
-			opacity = 0.95,
-		}
-	}, true)
-	if db.profile.names then
-		db.profile.subKeys = db.profile.names
-		db.profile.names = nil
-	end
-
-	frame = CreateFrame("Frame", "AdiDebugFrame", UIParent)
-	frame:Hide()
-	frame:SetSize(db.profile.width, db.profile.height)
-	frame:SetPoint(db.profile.point, db.profile.xOffset, db.profile.yOffset)
-	frame:SetClampedToScreen(true)
-	frame:SetClampRectInsets(4,-4,-4,4)
-	frame:SetMovable(true)
-	frame:SetResizable(true)
-	frame:SetFrameStrata("FULLSCREEN_DIALOG")
-	frame:SetToplevel(true)
-	frame:SetMinResize(300, 120)
-
-	frame:EnableMouse(true)
-	frame:SetScript('OnMouseDown', function(self)
-		if not self.movingOrSizing and IsShiftKeyDown() then
-			local x, y = GetCursorPosition()
-			local scale = self:GetEffectiveScale()
-			local left, bottom, width, height = self:GetRect()
-			x, y = (x / scale) - left, (y / scale) - bottom
-			local horiz = (x < 16) and "LEFT" or (x > width - 16) and "RIGHT"
-			local vert = (y < 16) and "BOTTOM" or (y > height - 16) and "TOP"
-			if horiz or vert then
-				self:StartSizing(strjoin("", vert or "", horiz or ""))
-			else
-				self:StartMoving()
-			end
-			self.movingOrSizing = true
-		end
-	end)
-	frame:SetScript('OnMouseUp', function(self)
-		if self.movingOrSizing then
-			self.movingOrSizing = nil
-			frame:StopMovingOrSizing()
-			db.profile.width, db.profile.height = frame:GetSize()
-			local _
-			_, _, db.profile.point, db.profile.xOffset, db.profile.yOffset = frame:GetPoint()
-		end
-	end)
-
-	local background = CreateFrame("Frame", nil, frame)
-	background:SetAllPoints(frame)
+	local background = CreateFrame("Frame", nil, self)
+	background:SetAllPoints(self)
 	background:SetBackdrop({
 		bgFile = [[Interface\Addons\AdiDebug\media\white16x16]], tile = true, tileSize = 16,
 		edgeFile = [[Interface\Tooltips\UI-Tooltip-Border]], edgeSize = 16,
@@ -295,98 +385,86 @@ local function CreateOurFrame()
 	})
 	background:SetBackdropColor(0,0,0,0.9)
 	background:SetBackdropBorderColor(1,1,1,1)
-	local ALPHA_DELAY = 0.25
-	local function GetOpacitySettings()
-		if db.profile.autoFadeOut then
-			return frame.movingOrSizing or frame:IsMouseOver(), db.profile.opacity, 0.95
-		else
-			return true, 0.1, db.profile.opacity
-		end
+	background:SetScript('OnUpdate', Background_OnUpdate)
+	background:SetScript('OnShow', Background_OnShow)
+	Background_OnShow(background)
+
+	local function AttachTooltip(target, text)
+		target.tooltipText = text
+		target:SetScript('OnEnter', ShowTooltipText)
+		target:SetScript('OnLeave', GameTooltip_Hide)
 	end
-	background:SetScript('OnUpdate', function(self, elapsed)
-		local alpha, newAlpha = self:GetAlpha()
-		local goMax, minAlpha, maxAlpha = GetOpacitySettings()
-		if goMax then
-			newAlpha = min(maxAlpha, alpha + (maxAlpha - minAlpha) * elapsed / ALPHA_DELAY)
-		else
-			newAlpha = max(minAlpha, alpha - (maxAlpha - minAlpha) * elapsed / ALPHA_DELAY)
-		end
-		if newAlpha ~= alpha then
-			self:SetAlpha(newAlpha)
-		end
-	end)
-	background:SetScript('OnShow', function(self)
-		local goMax, minAlpha, maxAlpha = GetOpacitySettings()
-		self:SetAlpha(goMax and maxAlpha or minAlpha) 
-	end)
+
+	----- Close button -----
 
 	local closeButton = CreateFrame("Button", nil, background, "UIPanelCloseButton")
 	closeButton:SetPoint("TOPRIGHT")
-	closeButton:SetScript('OnClick', function() frame:Hide() end)
+	closeButton:SetScript('OnClick', function() self:Hide() end)
 	AttachTooltip(closeButton, "Hide")
 
-	selector = CreateFrame("Button", "AdiDebugDropdown", background, "UIDropDownMenuTemplate")
+	----- Stream selector -----
+
+	local menuFrame = CreateFrame("Frame", "AdiDebugDropdownMenu", nil, "UIDropDownMenuTemplate")
+	self.menuList = { closeEntry }
+	self.menuKeyEntries = {}
+
+	local selector = CreateFrame("Button", "AdiDebugDropdown", background, "UIDropDownMenuTemplate")
 	selector:SetPoint("TOPLEFT", -12, -4)
 	selector:SetWidth(145)
-	selector.initialize = Selector_Initialize
-	selector.text = _G["AdiDebugDropdownText"]
+	selector.Text = AdiDebugDropdownText
 	AttachTooltip(selector, "Debugging stream\nSelect the debugging stream to watch.")
+	self.Selector = selector
 
-	messageArea = CreateFrame("ScrollingMessageFrame", nil, frame)
-	messageArea:SetPoint("TOPLEFT", frame, "TOPLEFT", 8, -28)
-	messageArea:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -24, 8)
-	messageArea:SetFading(false)
-	messageArea:SetJustifyH("LEFT")
-	messageArea:SetMaxLines(550)
-	messageArea:SetFontObject(ChatFontNormal)
-	messageArea:SetShadowOffset(1, -1)
-	messageArea:SetShadowColor(0, 0, 0, 1)
-	messageArea:SetScript('OnMessageScrollChanged', UpdateScrollBar)
-	messageArea:SetScript('OnSizeChanged', UpdateScrollBar)
-	messageArea:SetIndentedWordWrap(true)
-	messageArea:Raise()
-
-	messageArea:SetHyperlinksEnabled(true)
-	messageArea:SetScript('OnHyperlinkClick', OnHyperlinkClick)
-	messageArea:SetScript('OnHyperlinkEnter', OnHyperlinkEnter)
-	messageArea:SetScript('OnHyperlinkLeave', GameTooltip_Hide)
-
-	messageArea:EnableMouseWheel(true)
-	messageArea:SetScript('OnMouseWheel', function(self, delta)
-		local num, displayed = self:GetNumMessages(), self:GetNumLinesDisplayed()
-		local step = IsShiftKeyDown() and num or IsControlKeyDown() and displayed or 1
-		local current = self:GetCurrentScroll()
-		local newOffset = min(max(0, current + step * delta), num - displayed)
-		if newOffset ~= current then
-			self:SetScrollOffset(newOffset)
-			UpdateScrollBar()
-		end
+	AdiDebugDropdownButton:SetScript('OnClick', function()
+		return EasyMenu(self.menuList, menuFrame, "AdiDebugDropdown", 16, 8, "MENU")
 	end)
 
-	scrollBar = CreateFrame("Slider", nil, background, "UIPanelScrollBarTemplate")
-	scrollBar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -8, -44)
-	scrollBar:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -8, 24)
+	----- Message area -----
+
+	local messages = CreateFrame("ScrollingMessageFrame", nil, self)
+	messages:SetPoint("TOPLEFT", self, "TOPLEFT", 8, -28)
+	messages:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -24, 8)
+	messages:SetFading(false)
+	messages:SetJustifyH("LEFT")
+	messages:SetMaxLines(550)
+	messages:SetFontObject(ChatFontNormal)
+	messages:SetShadowOffset(1, -1)
+	messages:SetShadowColor(0, 0, 0, 1)
+	messages:Raise()
+	messages:SetIndentedWordWrap(true)
+	messages:SetHyperlinksEnabled(true)
+	messages:EnableMouseWheel(true)
+	local UpdateScrollBar = function() self:UpdateScrollBar() end
+	messages:SetScript('OnMessageScrollChanged', UpdateScrollBar)
+	messages:SetScript('OnSizeChanged', UpdateScrollBar)
+	messages:SetScript('OnHyperlinkClick', Messages_OnHyperlinkClick)
+	messages:SetScript('OnHyperlinkEnter', Messages_OnHyperlinkEnter)
+	messages:SetScript('OnHyperlinkLeave', GameTooltip_Hide)
+	messages:SetScript('OnMouseWheel', Messages_OnMouseWheel)
+	self.Messages = messages
+
+	----- Scroll bar -----
+
+	local scrollBar = CreateFrame("Slider", nil, background, "UIPanelScrollBarTemplate")
+	scrollBar:Hide()
+	scrollBar:SetPoint("TOPRIGHT", self, "TOPRIGHT", -8, -44)
+	scrollBar:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -8, 24)
 	scrollBar:SetValueStep(1)
 	scrollBar.scrollStep = 3
-	scrollBar:GetParent().SetVerticalScroll = function(_, value)
-		if safetyLock then return end
-		local _, maxVal = scrollBar:GetMinMaxValues()
-		local offset = maxVal - value
-		if messageArea:GetCurrentScroll() ~= offset then
-			safetyLock = true
-			messageArea:SetScrollOffset(offset)
-			safetyLock = false
-		end
-	end
-	scrollBar:Hide()
+	scrollBar:GetParent().SetVerticalScroll = function(_, value) self:SetVerticalScroll(value) end
+	self.ScrollBar = scrollBar
+
+	----- Auto fade button -----
 
 	local autoFadeButton = CreateFrame("CheckButton", nil, background, "UICheckButtonTemplate")
 	autoFadeButton:RegisterForClicks("anyup")
 	autoFadeButton:SetSize(24, 24)
 	autoFadeButton:SetPoint("TOPRIGHT", -32, -4)
-	autoFadeButton:SetScript('OnClick', function() db.profile.autoFadeOut = not not autoFadeButton:GetChecked()	end)
-	autoFadeButton:SetChecked(db.profile.autoFadeOut)
-	AttachTooltip(autoFadeButton, "Auto fade out\nAutomatically fade out the frame when the mouse cursor is not hovering it.")
+	autoFadeButton:SetScript('OnClick', function(button) self.db.profile.autoFadeOut = not not button:GetChecked() end)
+	autoFadeButton:SetChecked(self.db.profile.autoFadeOut)
+	AttachTooltip(autoFadeButton, "Auto fade out\nAutomatically fade out the self when the mouse cursor is not hovering it.")
+
+	----- Opacity slider -----
 
 	local opacitySlider = CreateFrame("Slider", nil, background)
 	opacitySlider:SetSize(80, 16)
@@ -401,19 +479,58 @@ local function CreateOurFrame()
 	opacitySlider:SetPoint("TOPRIGHT", -64, -8)
 	opacitySlider:SetValueStep(0.05)
 	opacitySlider:SetMinMaxValues(0.1, 0.95)
-	opacitySlider:SetValue(db.profile.opacity)
-	opacitySlider:SetScript('OnValueChanged', function(_, value) db.profile.opacity = value end)
-	AttachTooltip(opacitySlider, "Frame opacity\nAdjust the frame opacity.\nThis is the lowest opacity if auto fading is enabled else it is the frame opacity.")
+	opacitySlider:SetValue(self.db.profile.opacity)
+	opacitySlider:SetScript('OnValueChanged', function(_, value) self.db.profile.opacity = value end)
+	AttachTooltip(opacitySlider, "Frame opacity\nAdjust the self opacity.\nThis is the lowest opacity if auto fading is enabled else it is the self opacity.")
 
-	frame:SetScript('OnShow', UpdateScrollBar)
-end
+	-- Register callbacks
+	AdiDebug.RegisterCallback(self, "AdiDebug_NewKey")
+	AdiDebug.RegisterCallback(self, "AdiDebug_NewSubKey")
+	AdiDebug.RegisterCallback(self, "AdiDebug_NewMessage")
 
-AdiDebug.RegisterCallback("AdiDebug_GUI", "AdiDebug_NewMessage", function(event, key, subKey, now, text)
-	if key == currentKey then
-		AddMessage(subKey, now, text)
-		UpdateScrollBar()
+	-- Fetch existing keys and sub-keys
+	for key in AdiDebug:IterateKeys() do
+		self:AdiDebug_NewKey('Initialize', key)
+		for subKey in AdiDebug:IterateSubKeys(key) do
+			self:AdiDebug_NewSubKey('Initialize', key, subKey)
+		end
+	end
+
+end)
+
+-- ----------------------------------------------------------------------------
+-- Addon initialization
+-- ----------------------------------------------------------------------------
+
+AdiDebugGUI:SetScript('OnEvent', function(self, event, name)
+	if event == 'ADDON_LOADED' and name == addonName then
+		self:UnregisterEvent('ADDON_LOADED')
+		self:SetScript('OnEvent', nil)
+
+		self.db = AdiDebug.db:RegisterNamespace("GUI", {
+			profile = {
+				point = "TOPLEFT",
+				xOffset = 16,
+				yOffset = -200,
+				width = 640,
+				height = 400,
+				subKeys = { ['*'] = { ['*'] = true } },
+				autoFadeOut = false,
+				opacity = 0.95,
+			}
+		}, true)
+
+		if self.db.profile.names then
+			self.db.profile.subKeys = self.db.profile.names
+			self.db.profile.names = nil
+		end
+
+		if self.db.profile.shown then
+			self:Show()
+		end
 	end
 end)
+AdiDebugGUI:RegisterEvent('ADDON_LOADED')
 
 -- ----------------------------------------------------------------------------
 -- Chat Command
@@ -425,21 +542,17 @@ function SlashCmdList.ADIDEBUG(arg)
 	if strtrim(arg) == "" then
 		arg = nil
 	end
-	if not frame then
-		CreateOurFrame()
-	elseif not arg and frame:IsShown() then
-		frame:Hide()
+	if not arg and AdiDebugGUI:IsShown() then
+		AdiDebugGUI:Hide()
 		return
 	end
+	AdiDebugGUI:Show()
 	if arg then
 		arg = strlower(arg)
 		for key in AdiDebug:IterateKeys() do
 			if strlower(key) == arg then
-				SelectKey(key)
+				AdiDebugGUI:SelectKey(key)
 			end
 		end
-	elseif db.profile.key and AdiDebug:HasKey(db.profile.key) then
-		SelectKey(db.profile.key)
 	end
-	frame:Show()
 end

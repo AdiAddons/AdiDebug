@@ -424,12 +424,12 @@ function AdiDebug:Open(arg)
 	end
 	if arg and arg ~= "" then
 		arg = strlower(arg)
-		for key in pairs(AdiDebug.messages) do
+		for key in AdiDebug:IterateKeys() do
 			if strlower(key) == arg then
 				SelectKey(key)
 			end
 		end
-	elseif db.profile.key and AdiDebug.messages[db.profile.key] then
+	elseif db.profile.key and AdiDebug:HasKey(db.profile.key) then
 		SelectKey(db.profile.key)
 	end
 	frame:Show()

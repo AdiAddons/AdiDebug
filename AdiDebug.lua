@@ -127,6 +127,10 @@ local function keyIterator(_, key)
 	return key
 end
 
+function AdiDebug:HasKey(key)
+	return not not messages[key]
+end
+
 function AdiDebug:IterateKeys() 
 	return keyIterator
 end

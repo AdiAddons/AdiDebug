@@ -18,6 +18,20 @@ local select, time = select, time
 local tinsert, tremove, tconcat = tinsert, tremove, table.concat
 
 -- ----------------------------------------------------------------------------
+-- Color scheme
+-- ----------------------------------------------------------------------------
+
+AdiDebug.hexColors = {
+	["nil"]      = "aaaaaa",
+	["boolean"]  = "77aaff",
+	["number"]   = "aa77ff",
+	["table"]    = "44ffaa",
+	["UIObject"] = "ffaa44",
+	-- ["function"] =
+	-- ["userdata"] =
+}
+
+-- ----------------------------------------------------------------------------
 -- Error catching call
 -- ----------------------------------------------------------------------------
 
@@ -44,21 +58,27 @@ local function GuessTableName(value)
 		or value.name
 end
 
+local function GetRawTableName(value)
+	local mt = getmetatable(value)
+	setmetatable(value, nil)
+	local name = gsub(tostring(value), 'table: ', '')
+	setmetatable(value, mt)
+	return name
+end
+
 local tableNameCache = setmetatable({}, {
 	__mode = 'k',
 	__index = function(self, value)
 		local name = safecall(GuessTableName, value)
 		if not name then
-			local mt = getmetatable(value)
-			setmetatable(value, nil)
-			name = gsub(tostring(value), 'table: ', '')
-			setmetatable(value, mt)
+			name = GetRawTableName(value)
 		end
 		self[value] = name
 		return name
 	end
 })
 
+---
 function AdiDebug:GetTableName(value)
 	return type(value) == "table" and tableNameCache[value] or tostring(value)
 end
@@ -67,15 +87,22 @@ end
 -- Table/frame hyperlink builder
 -- ----------------------------------------------------------------------------
 
-local function BuildHyperLink(value)
-	local name = AdiDebug:GetTableName(value)
-	local color, linkType
-	if type(value[0]) == "userdata" then
-		color, linkType = "ffaa44", "Frame"
-	else
-		color, linkType = "44ffaa", "Table"
+---
+function AdiDebug:GetSmartType(value)
+	local t = type(value)
+	if t == "table" and type(t[0]) == "userdata" then
+		return "UIObject"
 	end
-	return format("|cff%s|HAdiDebug%s:%s|h[%s]|h|r", color, linkType, name, name)
+	return t
+end
+
+-- ----------------------------------------------------------------------------
+-- Table/frame hyperlink builder
+-- ----------------------------------------------------------------------------
+
+local function BuildHyperLink(value)
+	local name, valueType = AdiDebug:GetTableName(value), AdiDebug:SmartType(value)
+	return format("|cff%s|HAdiDebug%s:%s|h[%s]|h|r", AdiDebug.hexColors[valueType], valueType, name, name)
 end
 
 local linkRefs = setmetatable({}, {__mode = 'v'})
@@ -89,10 +116,12 @@ local linkCache = setmetatable({}, {
 	end
 })
 
+---
 function AdiDebug:GetTableHyperlink(value)
 	return type(value) == "table" and linkCache[value] or tostring(value)
 end
 
+---
 function AdiDebug:GetTableHyperlinkTable(link)
 	return link and linkRefs[link]
 end
@@ -101,17 +130,25 @@ end
 -- Pretty formatting
 -- ----------------------------------------------------------------------------
 
-function AdiDebug:PrettyFormat(value)
-	if value == nil then
-		return "|cffaaaaaanil|r"
-	elseif value == true or value == false then
-		return format("|cff77aaff%s|r", tostring(value))
-	elseif type(value) == "number" then
-		return format("|cffaa77ff%s|r", tostring(value))
-	elseif type(value) == "table" then
-		return AdiDebug:GetTableHyperlink(value)
+---
+function AdiDebug:PrettyFormat(value, noLink, noTableName)
+	local str
+	if type(value) == "table" then
+		if not noLink then
+			return self:GetTableHyperlink(value)
+		elseif noTableName then
+			str = '['..self:GetTableName(value)..']'
+		else
+			str = '['..GetRawTableName(value)..']'
+		end
 	else
-		return tostring(value)
+		str = tostring(value)
+	end
+	local color = self.hexColors[self:GetSmartType(value)]
+	if color then
+		return format("|cff%s%s|r", color, str)
+	else
+		return str
 	end
 end
 
@@ -122,25 +159,44 @@ end
 local messages = {}
 local subKeys = {}
 
-local function keyIterator(_, key)
-	key = next(messages, key)
+local function keyIterator(t, key)
+	key = next(t, key)
 	return key
 end
 
+--- Tests if a stream key has been defined.
+-- @param key The key to test.
+-- @return True if the key exists.
 function AdiDebug:HasKey(key)
 	return not not messages[key]
 end
 
+--- Provides an iterator for the registered stream keys.
+-- @return Suitable values for the "in" part of an "for ... in ... do" statement
+-- @usage
+-- for key in AdiDebug:IterateKeys() do
+--   -- Do something usefull with key
+-- end
 function AdiDebug:IterateKeys()
-	return keyIterator
+	return keyIterator, messages
 end
 
+--- Tests is sub-keys have been defined for a given stream key.
+-- @param key The stream key to examine.
+-- @return True if sub-keys exists for that stream key
 function AdiDebug:HasSubKeys(key)
 	return not not next(subKeys[key])
 end
 
+--- Provides an iterator for the sub-keys of a given stream key.
+-- @param key The stream key.
+-- @return Suitable values for the "in" part of an "for ... in ... do" statement
+-- @usage
+-- for subKey in AdiDebug:IterateSubKeys("test") do
+--   -- Do something usefull with subKey
+-- end
 function AdiDebug:IterateSubKeys(key)
-	return pairs(subKeys[key])
+	return keyIterator, subKeys[key]
 end
 
 local function messageIterator(keyMessages, index)
@@ -151,6 +207,13 @@ local function messageIterator(keyMessages, index)
 	end
 end
 
+--- Provides an iterator for the messages of a given stream.
+-- @param key The stream key.
+-- @return Suitable values for the "in" part of an "for ... in ... do" statement
+-- @usage
+-- for index, subKey, timestamp, message in AdiDebug:IterateMessages("test") do
+--   -- Do something meaningful with those value
+-- end
 function AdiDebug:IterateMessages(key)
 	return messageIterator, messages[key], 0
 end
@@ -235,10 +298,22 @@ local sinkMethods = setmetatable({}, { __index = function(self, key)
 	return sink
 end})
 
+--- Creates a sink function for a given stream.
+-- @param key The stream key.
+-- @return A sink function that accepts any number of arguments.
+-- @usage
+-- local Debug = AdiDebug:GetSink("test")
+-- Debug("bla")
 function AdiDebug:GetSink(key)
 	return sinkFuncs[key]
 end
 
+--- Embeds a sink method into an existing object.
+-- @parma target The object to embed AdiDebug into.
+-- @param key The stream key.
+-- @usage
+-- AdiDebug:Embed(MyObject, "test")
+-- MyObject:Debug("bla")
 function AdiDebug:Embed(target, key)
 	target.Debug = sinkMethods[key]
 	return target.Debug

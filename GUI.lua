@@ -216,31 +216,65 @@ end
 -- Frame/table tooltips
 -- ----------------------------------------------------------------------------
 
-local function ShowFrameAttribute(self, getterName)
-	if not self[getterName] then return end
-	local value = self[getterName](self)
-	local isBool, label = strmatch(getterName, "^(Is)(%w+)$")
-	if isBool then
-		value = not not value
-	else
-		label = strmatch(getterName, "^Get(%w+)$") or getterName
+local getters = {
+	-- UIObject
+	"GetObjectType",
+	-- Region
+	"GetParent", "IsProtected", "GetRect",
+	-- VisibleRegion
+	"GetAlpha", "IsShown", "IsVisible",
+	-- Frame
+	"GetFrameStrata",	"GetFrameLevel", "GetScale", "GetID", "GetNumChildren", "GetNumRegions",
+  "GetPropagateKeyboardInput", "IsClampedToScreen", "IsJoystickEnabled", "IsKeyboardEnabled", "IsMouseEnabled",
+	"IsMouseWheelEnabled", "IsMovable", "IsResizable", "IsToplevel", "IsUserPlaced",
+	"GetBackdrop", "GetBackdropBorderColor", "GetBackdropColor",
+	-- Button
+	"GetButtonState",	"GetMotionScriptsWhileDisabled", "GetTextHeight", "GetTextWidth", "IsEnabled",
+	"GetDisabledTexture", "GetDisabledFontObject", "GetFontString", "GetHighlightFontObject", "GetHighlightTexture",
+	"GetNormalFontObject", "GetNormalTexture", "GetPushedTextOffset", "GetPushedTexture",
+	-- CheckButton
+	"GetChecked",
+	-- ScrollFrame
+	"GetHorizontalScroll", "GetHorizontalScrollRange","GetVerticalScroll", "GetVerticalScrollRange", "GetScrollChild",
+	-- Slider
+	"GetMinMaxValues", "GetOrientation", "GetThumbTexture", "GetValue", "GetValueStep",
+	-- StatusBar
+	"GetRotatesTexture", "GetStatusBarColor", "GetStatusBarTexture",
+	-- FontInstance
+	"GetFontObject", "GetJustifyH", "GetJustifyV", "GetShadowColor", "GetShadowOffset", "GetSpacing", "GetTextColor",
+	-- FontString
+	"GetFieldSize", "GetIndentedWordWrap", "GetText", "GetStringWidth", "GetStringHeight", "IsTruncated",
+	"CanNonSpaceWrap", "CanWordWrap",
+	-- Texture
+	"GetBlendMode", "GetNonBlocking", "GetTexture", "GetHorizTile", "GetVertTile", "IsDesaturated",	"GetTexCoord", "GetVertexColor",
+	-- GameTooltip
+	"GetOwner", "GetUnit", "GetSpell", "GetItem", "IsEquippedItem",
+}
+
+local t = {}
+local function Format(...)
+	local n = select('#', ...)
+	for i = 1, n do
+		t[i] = AdiDebug:PrettyFormat(select(i, ...), true, 30)
 	end
-	GameTooltip:AddDoubleLine(label, AdiDebug:PrettyFormat(value, true, 30))
+	return table.concat(t, ", ", 1, n)
 end
 
-local function ShowUIObjectTooltip(self)
-	ShowFrameAttribute(self, "GetObjectType")
-	ShowFrameAttribute(self, "GetParent")
-	ShowFrameAttribute(self, "IsProtected")
-	ShowFrameAttribute(self, "GetLeft")
-	ShowFrameAttribute(self, "GetBottom")
-	ShowFrameAttribute(self, "GetWidth")
-	ShowFrameAttribute(self, "GetHeight")
-	ShowFrameAttribute(self, "GetAlpha")
-	ShowFrameAttribute(self, "IsShown")
-	ShowFrameAttribute(self, "IsVisible")
-	ShowFrameAttribute(self, "GetFrameStrata")
-	ShowFrameAttribute(self, "GetFrameLevel")
+local function ShowUIObjectTooltip(obj)
+	-- We're doing duck typing there
+	for i, getter in ipairs(getters) do
+		if type(obj[getter]) == "function" then
+			local value = obj[getter](obj)
+			local label = strmatch(getter, "^Is(%w+)$") or strmatch(getter, "^(Can%w+)$")
+			if label then
+				value = AdiDebug:PrettyFormat(not not value)
+			else
+				label = strmatch(getter, "^Get(%w+)$") or getter
+				value = Format(obj[getter](obj))
+			end
+			GameTooltip:AddDoubleLine(label, value)
+		end
+	end
 end
 
 local function ShowTableTooltip(value)

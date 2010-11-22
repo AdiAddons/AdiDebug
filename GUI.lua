@@ -253,7 +253,7 @@ local getters = {
 
 local t = {}
 local function Format(...)
-	local n = select('#', ...)
+	local n = max(1, select('#', ...))
 	for i = 1, n do
 		t[i] = AdiDebug:PrettyFormat(select(i, ...), true, 30)
 	end

@@ -415,14 +415,23 @@ AdiDebug.RegisterCallback("AdiDebug_GUI", "AdiDebug_NewMessage", function(event,
 	end
 end)
 
-function AdiDebug:Open(arg)
+-- ----------------------------------------------------------------------------
+-- Chat Command
+-- ----------------------------------------------------------------------------
+
+SLASH_ADIDEBUG1 = "/ad"
+SLASH_ADIDEBUG2 = "/adidebug"
+function SlashCmdList.ADIDEBUG(arg)
+	if strtrim(arg) == "" then
+		arg = nil
+	end
 	if not frame then
 		CreateOurFrame()
 	elseif not arg and frame:IsShown() then
 		frame:Hide()
 		return
 	end
-	if arg and arg ~= "" then
+	if arg then
 		arg = strlower(arg)
 		for key in AdiDebug:IterateKeys() do
 			if strlower(key) == arg then
@@ -434,5 +443,3 @@ function AdiDebug:Open(arg)
 	end
 	frame:Show()
 end
-
-AdiDebug.LoadAndOpen = AdiDebug.Open

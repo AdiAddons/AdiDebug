@@ -258,26 +258,6 @@ end)
 AdiDebug:RegisterEvent('ADDON_LOADED')
 
 -- ----------------------------------------------------------------------------
--- User interface
--- ----------------------------------------------------------------------------
-
-function AdiDebug:LoadAndOpen(arg)
-	if not IsAddOnLoaded("AdiDebug_GUI") and not LoadAddOn("AdiDebug_GUI") then
-		return
-	end
-	AdiDebug:Open(arg)
-end
-
-SLASH_ADIDEBUG1 = "/ad"
-SLASH_ADIDEBUG2 = "/adidebug"
-function SlashCmdList.ADIDEBUG(arg)
-	if strtrim(arg) == "" then
-		arg = nil
-	end
-	return AdiDebug:LoadAndOpen(arg)
-end
-
--- ----------------------------------------------------------------------------
 -- Emulate tekDebug
 -- ----------------------------------------------------------------------------
 

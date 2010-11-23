@@ -50,8 +50,8 @@ function AdiDebugGUI:SetVerticalScroll(value)
 	end
 end
 
-function AdiDebugGUI:AddMessage(subKey, timestamp, text)
-	if not self.db.profile.subKeys[self.currentKey][subKey] then
+function AdiDebugGUI:AddMessage(category, timestamp, text)
+	if not self.db.profile.categories[self.currentStreamId][category] then
 		return
 	end
 	if timestamp ~= self.currentTimestamp then
@@ -64,20 +64,20 @@ end
 function AdiDebugGUI:RefreshMessages()
 	self.Messages:Clear()
 	self.currentTimestamp = nil
-	if self.currentKey then
-		for i, subKey, now, text in AdiDebug:IterateMessages(self.currentKey) do
-			self:AddMessage(subKey, now, text)
+	if self.currentStreamId then
+		for i, category, now, text in AdiDebug:IterateMessages(self.currentStreamId) do
+			self:AddMessage(category, now, text)
 		end
 	end
 	self:UpdateScrollBar()
 end
 
-function AdiDebugGUI:SelectKey(key)
-	if not AdiDebug:HasKey(key) then return end
-	self.db.profile.key = key
-	if key == self.currentKey then return end
-	self.currentKey = key
-	self.Selector.Text:SetText(key or "")
+function AdiDebugGUI:SelectStream(streamId)
+	if not AdiDebug:HasStream(streamId) then return end
+	self.db.profile.streamId = streamId
+	if streamId == self.currentStreamId then return end
+	self.currentStreamId = streamId
+	self.Selector.Text:SetText(streamId or "")
 	self:RefreshMessages()
 	return true
 end
@@ -86,24 +86,24 @@ end
 -- Selector menu handling
 -- ----------------------------------------------------------------------------
 
-local keyEntryMeta = { __index = {
+local streamEntryMeta = { __index = {
 	checked = function(button)
-		return AdiDebugGUI.currentKey and button.value == AdiDebugGUI.currentKey
+		return AdiDebugGUI.currentStreamId and button.value == AdiDebugGUI.currentStreamId
 	end,
 	func = function(button)
-		AdiDebugGUI:SelectKey(button.value)
+		AdiDebugGUI:SelectStream(button.value)
 	end,
 }}
 
-local subKeyEntryMeta = { __index = {
+local categoryEntryMeta = { __index = {
 	isNotRadio = true,
 	keepShownOnClick = true,
 	checked = function(button)
-		return AdiDebugGUI.db.profile.subKeys[button.arg1][button.value]
+		return AdiDebugGUI.db.profile.categories[button.arg1][button.value]
 	end,
-	func = function(button, key, _, checked)
-		AdiDebugGUI.db.profile.subKeys[button.arg1][button.value] = checked
-		if key == AdiDebugGUI.currentKey then
+	func = function(button, streamId, _, checked)
+		AdiDebugGUI.db.profile.categories[button.arg1][button.value] = checked
+		if streamId == AdiDebugGUI.currentStreamId then
 			AdiDebugGUI:RefreshMessages()
 		end
 	end,
@@ -124,48 +124,48 @@ local function SortEntries(a, b) -- a < b
 	end
 end
 
-function AdiDebugGUI:AddMenuKeyEntry(key)
+function AdiDebugGUI:AddMenuStreamEntry(streamId)
 	local entry = setmetatable({
-		text = key,
-		value = key,
+		text = streamId,
+		value = streamId,
 		menuList = { closeEntry }
-	}, keyEntryMeta)
-	self.menuKeyEntries[key] = entry
+	}, streamEntryMeta)
+	self.menuStreamEntries[streamId] = entry
 	tinsert(self.menuList, entry)
 	table.sort(self.menuList, SortEntries)
-	self:AddMenuSubKeyEntry(key, key)
+	self:AddMenuCategoryEntry(streamId, streamId)
 end
 
-function AdiDebugGUI:AddMenuSubKeyEntry(key, subKey)
-	local keyEntry = self.menuKeyEntries[key]
+function AdiDebugGUI:AddMenuCategoryEntry(streamId, category)
+	local streamEntry = self.menuStreamEntries[streamId]
 	local entry = setmetatable({
-		text = subKey,
-		value = subKey,
-		arg1 = key,
-	}, subKeyEntryMeta)
-	keyEntry.hasArrow = #(keyEntry.menuList) > 2
-	tinsert(keyEntry.menuList, entry)
-	table.sort(keyEntry.menuList, SortEntries)
+		text = category,
+		value = category,
+		arg1 = streamId,
+	}, categoryEntryMeta)
+	tinsert(streamEntry.menuList, entry)
+	streamEntry.hasArrow = #(streamEntry.menuList) > 2
+	table.sort(streamEntry.menuList, SortEntries)
 end
 
 -- ----------------------------------------------------------------------------
 -- AdiDebug callback handlers
 -- ----------------------------------------------------------------------------
 
-function AdiDebugGUI:AdiDebug_NewKey(event, key)
-	self:AddMenuKeyEntry(key)
-	if not self.currentKey and key == self.db.profile.key then
-		self:SelectKey(key)
+function AdiDebugGUI:AdiDebug_NewStream(event, streamId)
+	self:AddMenuStreamEntry(streamId)
+	if not self.currentStreamId and streamId == self.db.profile.streamId then
+		self:SelectStream(streamId)
 	end
 end
 
-function AdiDebugGUI:AdiDebug_NewSubKey(event, key, subKey)
-	self:AddMenuSubKeyEntry(key, subKey)
+function AdiDebugGUI:AdiDebug_NewCategory(event, streamId, category)
+	self:AddMenuCategoryEntry(streamId, category)
 end
 
-function AdiDebugGUI:AdiDebug_NewMessage(event, key, subKey, now, text)
-	if key == self.currentKey then
-		self:AddMessage(subKey, now, text)
+function AdiDebugGUI:AdiDebug_NewMessage(event, streamId, category, now, text)
+	if streamId == self.currentStreamId then
+		self:AddMessage(category, now, text)
 		self:UpdateScrollBar()
 	end
 end
@@ -433,7 +433,7 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 
 	local menuFrame = CreateFrame("Frame", "AdiDebugDropdownMenu", nil, "UIDropDownMenuTemplate")
 	self.menuList = { closeEntry }
-	self.menuKeyEntries = {}
+	self.menuStreamEntries = {}
 
 	local selector = CreateFrame("Button", "AdiDebugDropdown", background, "UIDropDownMenuTemplate")
 	selector:SetPoint("TOPLEFT", -12, -4)
@@ -512,15 +512,15 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 	AttachTooltip(opacitySlider, "Frame opacity\nAdjust the self opacity.\nThis is the lowest opacity if auto fading is enabled else it is the self opacity.")
 
 	-- Register callbacks
-	AdiDebug.RegisterCallback(self, "AdiDebug_NewKey")
-	AdiDebug.RegisterCallback(self, "AdiDebug_NewSubKey")
+	AdiDebug.RegisterCallback(self, "AdiDebug_NewStream")
+	AdiDebug.RegisterCallback(self, "AdiDebug_NewCategory")
 	AdiDebug.RegisterCallback(self, "AdiDebug_NewMessage")
 
-	-- Fetch existing keys and sub-keys
-	for key in AdiDebug:IterateKeys() do
-		self:AdiDebug_NewKey('Initialize', key)
-		for subKey in AdiDebug:IterateSubKeys(key) do
-			self:AdiDebug_NewSubKey('Initialize', key, subKey)
+	-- Fetch existing streams and categories
+	for streamId in AdiDebug:IterateStreams() do
+		self:AdiDebug_NewStream('Initialize', streamId)
+		for category in AdiDebug:IterateCategories(streamId) do
+			self:AdiDebug_NewCategory('Initialize', streamId, category)
 		end
 	end
 
@@ -542,16 +542,11 @@ AdiDebugGUI:SetScript('OnEvent', function(self, event, name)
 				yOffset = -200,
 				width = 640,
 				height = 400,
-				subKeys = { ['*'] = { ['*'] = true } },
+				categories = { ['*'] = { ['*'] = true } },
 				autoFadeOut = false,
 				opacity = 0.95,
 			}
 		}, true)
-
-		if self.db.profile.names then
-			self.db.profile.subKeys = self.db.profile.names
-			self.db.profile.names = nil
-		end
 
 		if self.db.profile.shown then
 			self:Show()
@@ -577,9 +572,9 @@ function SlashCmdList.ADIDEBUG(arg)
 	AdiDebugGUI:Show()
 	if arg then
 		arg = strlower(arg)
-		for key in AdiDebug:IterateKeys() do
-			if strlower(key) == arg then
-				AdiDebugGUI:SelectKey(key)
+		for streamId in AdiDebug:IterateStreams() do
+			if strlower(streamId) == arg then
+				AdiDebugGUI:SelectStream(streamId)
 			end
 		end
 	end

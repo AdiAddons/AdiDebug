@@ -169,69 +169,68 @@ function AdiDebug:PrettyFormat(value, noLink, maxLength)
 end
 
 -- ----------------------------------------------------------------------------
--- Message stores and iterators
+-- Data and iterators
 -- ----------------------------------------------------------------------------
 
-local messages = {}
-local subKeys = {}
+local streams = {}
+local categories = {}
 
-local function keyIterator(t, key)
-	key = next(t, key)
-	return key
+local function keyIterator(t, k)
+	return (next(t, k))
 end
 
---- Tests if a stream key has been defined.
--- @param key The key to test.
--- @return True if the key exists.
-function AdiDebug:HasKey(key)
-	return not not messages[key]
+--- Tests if a stream exists.
+-- @param streamId The identifier of the stream to test.
+-- @return True if the stream exists.
+function AdiDebug:HasStream(streamId)
+	return not not streams[streamId]
 end
 
---- Provides an iterator for the registered stream keys.
+--- Provides an iterator for the registered streams.
 -- @return Suitable values for the "in" part of an "for ... in ... do" statement.
 -- @usage
--- for key in AdiDebug:IterateKeys() do
---   -- Do something usefull with key
+-- for streamId in AdiDebug:IterateStreams() do
+--   -- Do something usefull with streamId
 -- end
-function AdiDebug:IterateKeys()
-	return keyIterator, messages
+function AdiDebug:IterateStreams()
+	return keyIterator, streams
 end
 
---- Tests is sub-keys have been defined for a given stream key.
--- @param key The stream key to examine.
--- @return True if sub-keys exists for that stream key.
-function AdiDebug:HasSubKeys(key)
-	return not not next(subKeys[key])
+--- Tests if any category has been defined for a given stream.
+-- @param streamId The identifier of the stream.
+-- @return True if any category exists for that stream.
+function AdiDebug:HasCategory(streamId)
+	return not not next(categories[streamId])
 end
 
---- Provides an iterator for the sub-keys of a given stream key.
--- @param key The stream key.
+--- Provides an iterator for the categories of a given stream.
+-- @param streamId The identifier of the stream.
 -- @return Suitable values for the "in" part of an "for ... in ... do" statement.
 -- @usage
--- for subKey in AdiDebug:IterateSubKeys("test") do
---   -- Do something usefull with subKey
+-- for category in AdiDebug:IterateCategories("test") do
+--   -- Do something usefull with category
 -- end
-function AdiDebug:IterateSubKeys(key)
-	return keyIterator, subKeys[key]
+function AdiDebug:IterateCategories(streamId)
+	return keyIterator, categories[streamId]
 end
 
-local function messageIterator(keyMessages, index)
+local function messageIterator(stream, index)
 	index = index + 1
-	local message = keyMessages[index]
+	local message = stream[index]
 	if message then
 		return index, unpack(message)
 	end
 end
 
 --- Provides an iterator for the messages of a given stream.
--- @param key The stream key.
+-- @param streamId The identifier of the stream.
 -- @return Suitable values for the "in" part of an "for ... in ... do" statement
 -- @usage
---   for index, subKey, timestamp, message in AdiDebug:IterateMessages("test") do
+--   for index, category, timestamp, message in AdiDebug:IterateMessages("test") do
 --     -- Do something meaningful with those value
 --   end
-function AdiDebug:IterateMessages(key)
-	return messageIterator, messages[key], 0
+function AdiDebug:IterateMessages(streamId)
+	return messageIterator, streams[streamId], 0
 end
 
 -- ----------------------------------------------------------------------------
@@ -265,78 +264,76 @@ local function Format(...)
 	return tconcat(tmp, " ", 1, n)
 end
 
-local function Sink(key, subKey, ...)
-	assert(key)
-	assert(subKey)
-	local m = messages[key]
-	local t = tremove(heap, 1)
+local function Sink(streamId, category, ...)
+	assert(streamId)
+	assert(category)
+	local stream = streams[streamId]
+	local message = tremove(heap, 1)
 	local text = Format(...)
-	if not t then
-		t = { subKey, now, text }
+	if not message then
+		message = { category, now, text }
 	else
-		t[1], t[2], t[3] = subKey, now, text
+		message[1], message[2], message[3] = category, now, text
 	end
-	tinsert(m, t)
-	for i = 500, #m do
-		tinsert(heap, tremove(m, 1))
+	tinsert(stream, message)
+	for i = 500, #stream do
+		tinsert(heap, tremove(stream, 1))
 	end
-	if subKey ~= key and not subKeys[key][subKey] then
-		subKeys[key][subKey] = true
-		callbacks:Fire('AdiDebug_NewSubKey', key, subKey)
+	if category ~= streamId and not categories[streamId][category] then
+		categories[streamId][category] = true
+		callbacks:Fire('AdiDebug_NewCategory', streamId, category)
 	end
-	callbacks:Fire('AdiDebug_NewMessage', key, subKey, now, text)
+	callbacks:Fire('AdiDebug_NewMessage', streamId, category, now, text)
 end
 
 -- ----------------------------------------------------------------------------
 -- Registering new sinks
 -- ----------------------------------------------------------------------------
 
-local function RegisterKey(key)
-	if not messages[key] then
-		messages[key] = {}
-		callbacks:Fire('AdiDebug_NewKey', key)
-	end
-	if not subKeys[key] then
-		subKeys[key] = {}
+local function RegisterStream(streamId)
+	if not streams[streamId] then
+		streams[streamId] = {}
+		categories[streamId] = {}
+		callbacks:Fire('AdiDebug_NewStream', streamId)
 	end
 end
 
-local sinkFuncs = setmetatable({}, { __index = function(self, key)
+local sinkFuncs = setmetatable({}, { __index = function(self, streamId)
 	local sink = function(...)
-		return safecall(Sink, key, key, ...)
+		return safecall(Sink, streamId, streamId, ...)
 	end
-	self[key] = sink
-	RegisterKey(key)
+	self[streamId] = sink
+	RegisterStream(streamId)
 	return sink
 end})
 
-local sinkMethods = setmetatable({}, { __index = function(self, key)
+local sinkMethods = setmetatable({}, { __index = function(self, streamId)
 	local sink = function(obj, ...)
-		return safecall(Sink, key, AdiDebug:GetTableName(obj), obj, ...)
+		return safecall(Sink, streamId, AdiDebug:GetTableName(obj), obj, ...)
 	end
-	self[key] = sink
-	RegisterKey(key)
+	self[streamId] = sink
+	RegisterStream(streamId)
 	return sink
 end})
 
 --- Creates a sink function for a given stream.
--- @param key The stream key.
+-- @param streamId The identifier of the stream.
 -- @return A sink function that accepts any number of arguments.
 -- @usage
 -- local Debug = AdiDebug:GetSink("test")
 -- Debug("bla")
-function AdiDebug:GetSink(key)
-	return sinkFuncs[key]
+function AdiDebug:GetSink(streamId)
+	return sinkFuncs[streamId]
 end
 
 --- Embeds a sink method into an existing object.
 -- @parma target The object to embed AdiDebug into.
--- @param key The stream key.
+-- @param streamId The identifier of the stream.
 -- @usage
 -- AdiDebug:Embed(MyObject, "test")
 -- MyObject:Debug("bla")
-function AdiDebug:Embed(target, key)
-	target.Debug = sinkMethods[key]
+function AdiDebug:Embed(target, streamId)
+	target.Debug = sinkMethods[streamId]
 	return target.Debug
 end
 
@@ -348,7 +345,7 @@ AdiDebug:SetScript('OnEvent', function(self, event, name)
 	if name == addonName then
 		self:SetScript('OnEvent', nil)
 		self:UnregisterEvent('ADDON_LOADED')
-		self.db = LibStub('AceDB-3.0'):New('AdiDebugDB', { profile = { shown = false } }, true)
+		self.db = LibStub('AceDB-3.0'):New('AdiDebugDB', { profile = {} }, true)
 	end
 end)
 AdiDebug:RegisterEvent('ADDON_LOADED')

@@ -298,7 +298,6 @@ local function RegisterKey(key)
 	end
 	if not subKeys[key] then
 		subKeys[key] = {}
-		callbacks:Fire('AdiDebug_NewSubKey', key, key)
 	end
 end
 

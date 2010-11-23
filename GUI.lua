@@ -128,24 +128,22 @@ function AdiDebugGUI:AddMenuKeyEntry(key)
 	local entry = setmetatable({
 		text = key,
 		value = key,
+		menuList = { closeEntry }
 	}, keyEntryMeta)
 	self.menuKeyEntries[key] = entry
 	tinsert(self.menuList, entry)
 	table.sort(self.menuList, SortEntries)
+	self:AddMenuSubKeyEntry(key, key)
 end
 
 function AdiDebugGUI:AddMenuSubKeyEntry(key, subKey)
 	local keyEntry = self.menuKeyEntries[key]
-	if not keyEntry.menuList then
-		keyEntry.menuList = { closeEntry }
-	else
-		keyEntry.hasArrow = true
-	end
 	local entry = setmetatable({
 		text = subKey,
 		value = subKey,
 		arg1 = key,
 	}, subKeyEntryMeta)
+	keyEntry.hasArrow = #(keyEntry.menuList) > 2
 	tinsert(keyEntry.menuList, entry)
 	table.sort(keyEntry.menuList, SortEntries)
 end

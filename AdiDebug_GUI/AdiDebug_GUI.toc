@@ -7,7 +7,4 @@
 ## X-Date: @project-date-iso@
 ## RequiredDeps: AdiDebug
 
-## LoadManagers: AddonLoader
-## X-LoadOn-Slash: /ad /adidebug
-
 ..\AdiDebug\GUI.lua

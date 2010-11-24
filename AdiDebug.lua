@@ -64,7 +64,7 @@ end
 local function GetRawTableName(t)
 	local mt = getmetatable(t)
 	setmetatable(t, nil)
-	local name = gsub(tostring(t), '^table: ', '')
+	local name = tostring(t)
 	setmetatable(t, mt)
 	return name
 end
@@ -79,9 +79,9 @@ local tableNameCache = setmetatable({}, {
 })
 
 --- Get an human-readable name for a table, which could be an object or an UIObject.
--- First try to use :GetName() and :ToString() methods, if they exist.
--- Then try to get the name field.
--- As a last resort, returns the hexadecimal part of tostring(t).
+-- Firstly try to use :GetName() and :ToString() methods, if they exist.
+-- Then try to get the "name" field.
+-- Finally, returns tostring(t).
 -- @param t The table to examine.
 -- @return A table name, hopefully human-readable.
 function AdiDebug:GetTableName(t)

@@ -356,16 +356,12 @@ AdiDebug:RegisterEvent('ADDON_LOADED')
 -- Emulate tekDebug
 -- ----------------------------------------------------------------------------
 
-local function Frame_AddMessage(self, text) return self:Sink(text) end
-
 local frames = setmetatable({}, {__index = function(t, name)
-	local frame = {
-		Sink = AdiDebug:GetSink(name),
-		AddMessage = Frame_AddMessage
-	}
+	local sink = AdiDebug:GetSink(name)
+	local frame = { AddMessage = function(_, text) return sink(text) end }
 	t[name] = frame
 	return frame
+
 end})
 
 tekDebug = { GetFrame = function(_, name) return frames[name] end }
-

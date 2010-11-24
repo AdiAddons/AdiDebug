@@ -109,16 +109,44 @@ local categoryEntryMeta = { __index = {
 	end,
 }}
 
+local function SetAllCategories(streamId, shown)
+	local db = AdiDebugGUI.db.profile.categories[streamId]
+	db[streamId] = shown
+	for category in AdiDebug:IterateCategories(streamId) do
+		db[category] = shown
+	end
+	if streamId == AdiDebugGUI.currentStreamId then
+		AdiDebugGUI:RefreshMessages()
+	end
+end
+
+local selectAllEntryMeta = { __index = {
+	text = "Select all",
+	notCheckable = true,
+	__order = 10,
+	func = function(button) SetAllCategories(button.value, true) end,
+}}
+
+local unselectAllEntryMeta = { __index = {
+	text = "Unselect all",
+	notCheckable = true,
+	__order = 20,
+	func = function(button) SetAllCategories(button.value, false) end,
+}}
+
 local closeEntry = {
 	text = "Close menu",
 	notCheckable = true,
+	__order = 30,
 }
 
 local function SortEntries(a, b) -- a < b
-	if b == closeEntry then
-		return true
-	elseif a == closeEntry then
-		return false
+	if a.__order and b.__order then
+		return a.__order < b.__order
+	elseif b.__order then
+		return b.__order > 0
+	elseif a.__order then
+		return a.__order <= 0
 	else
 		return a.text < b.text
 	end
@@ -128,7 +156,6 @@ function AdiDebugGUI:AddMenuStreamEntry(streamId)
 	local entry = setmetatable({
 		text = streamId,
 		value = streamId,
-		menuList = { closeEntry }
 	}, streamEntryMeta)
 	self.menuStreamEntries[streamId] = entry
 	tinsert(self.menuList, entry)
@@ -143,8 +170,22 @@ function AdiDebugGUI:AddMenuCategoryEntry(streamId, category)
 		value = category,
 		arg1 = streamId,
 	}, categoryEntryMeta)
+	if category == streamId then
+		entry.__order = -10
+	end
+	if not streamEntry.menuList then
+		streamEntry.menuList = {
+			setmetatable({ value = streamId }, selectAllEntryMeta),
+			setmetatable({ value = streamId }, unselectAllEntryMeta),
+			closeEntry,
+		}
+	end
 	tinsert(streamEntry.menuList, entry)
-	streamEntry.hasArrow = #(streamEntry.menuList) > 2
+	if #streamEntry.menuList < 5 then
+		return
+	else
+		streamEntry.hasArrow = true
+	end
 	table.sort(streamEntry.menuList, SortEntries)
 end
 

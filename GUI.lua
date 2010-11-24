@@ -50,6 +50,17 @@ function AdiDebugGUI:SetVerticalScroll(value)
 	end
 end
 
+local id = 0
+local categoryIds = setmetatable({}, {__index = function(t,k)
+	id = id + 1
+	t[k] = id
+	return id
+end})
+
+function AdiDebugGUI:GetCategoryId(streamId, category)
+	return categoryIds[strjoin('/', streamId, category)]
+end
+
 function AdiDebugGUI:AddMessage(category, timestamp, text)
 	if not self.db.profile.categories[self.currentStreamId][category] then
 		return
@@ -58,7 +69,8 @@ function AdiDebugGUI:AddMessage(category, timestamp, text)
 		self.Messages:AddMessage(strjoin("", "----- ", date("%X", timestamp), strsub(format("%.3f", timestamp % 1), 2)), 0.6, 0.6, 0.6)
 		self.currentTimestamp = timestamp
 	end
-	self.Messages:AddMessage(text)
+	local r, g, b = unpack(self.db.profile.categoryColors[self.currentStreamId][category])
+	self.Messages:AddMessage(text, r, g, b, self:GetCategoryId(self.currentStreamId, category))
 end
 
 function AdiDebugGUI:RefreshMessages()
@@ -98,6 +110,7 @@ local streamEntryMeta = { __index = {
 local categoryEntryMeta = { __index = {
 	isNotRadio = true,
 	keepShownOnClick = true,
+	hasColorSwatch = true,
 	checked = function(button)
 		return AdiDebugGUI.db.profile.categories[button.arg1][button.value]
 	end,
@@ -169,7 +182,10 @@ function AdiDebugGUI:AddMenuCategoryEntry(streamId, category)
 		text = category,
 		value = category,
 		arg1 = streamId,
+		swatchFunc = function() AdiDebugGUI:SetCategoryColor(streamId, category, ColorPickerFrame:GetColorRGB()) end,
+		cancelFunc = function(values) AdiDebugGUI:SetCategoryColor(streamId, category, values.r, values.g, values.b) end,
 	}, categoryEntryMeta)
+	entry.r, entry.g, entry.b = unpack(self.db.profile.categoryColors[streamId][category]) 
 	if category == streamId then
 		entry.__order = -10
 	end
@@ -187,6 +203,22 @@ function AdiDebugGUI:AddMenuCategoryEntry(streamId, category)
 		streamEntry.hasArrow = true
 	end
 	table.sort(streamEntry.menuList, SortEntries)
+end
+
+function AdiDebugGUI:SetCategoryColor(streamId, category, r, g, b)
+	if not AdiDebug:HasStream(streamId) then return end
+	local c = self.db.profile.categoryColors[streamId][category]
+	c[1], c[2], c[3] = r, g, b
+	local streamEntry = self.menuStreamEntries[streamId]
+	for i, sub in pairs(streamEntry.menuList) do
+		if sub.value == category then
+			sub.r, sub.g, sub.b = r, g, b
+			break
+		end
+	end
+	if streamId == self.currentStreamId then
+		self.Messages:UpdateColorByID(self:GetCategoryId(streamId, category), r, g, b)
+	end
 end
 
 -- ----------------------------------------------------------------------------
@@ -587,6 +619,7 @@ AdiDebugGUI:SetScript('OnEvent', function(self, event, name)
 				width = 640,
 				height = 400,
 				categories = { ['*'] = { ['*'] = true } },
+				categoryColors = { ['*'] = { ['*'] = { 1, 1, 1 } } },
 				autoFadeOut = false,
 				opacity = 0.95,
 			}

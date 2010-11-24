@@ -31,7 +31,7 @@ AdiDebug.hexColors = {
 	["table"]    = "44ffaa",
 	["UIObject"] = "ffaa44",
 	["function"] = "77ffff",
-	["string"]   = "ffffff",
+--	["string"]   = "ffffff",
 }
 
 -- ----------------------------------------------------------------------------
@@ -151,21 +151,23 @@ end
 -- @return An human-readable representation of the value.
 function AdiDebug:PrettyFormat(value, noLink, maxLength)
 	local valueType = self:GetSmartType(value)
-	local color = self.hexColors[valueType] or ('ff0000'..valueType..':')
+	local stringRepr
 	if valueType == "table" or valueType == "UIObject" then
 		if not noLink then
 			return self:GetTableHyperlink(value)
 		else
-			return strjoin('', '|cff', color, self:GetTableName(value), '|r')
+			stringRepr = self:GetTableName(value)
 		end
 	elseif valueType == "number" and maxLength then
-		return strjoin('', '|cff', color, strtrim(format('%'..maxLength..'g', value)), '|r')
+		stringRepr = strtrim(format('%'..maxLength..'g', value))
+	else
+		stringRepr = tostring(value)
+		if maxLength and strlen(stringRepr) > maxLength then
+			stringRepr = strsub(stringRepr, 1, maxLength-3) .. '|cffaaaaaa...|r'
+		end
 	end
-	local	str = tostring(value)
-	if maxLength and strlen(str) > maxLength then
-		str = strsub(str, 1, maxLength-3) .. '|cffaaaaaa...|r'
-	end
-	return strjoin('', '|cff', color, str, '|r')
+	local color = self.hexColors[valueType]
+	return color and strjoin('', '|cff', color, stringRepr, '|r') or stringRepr
 end
 
 -- ----------------------------------------------------------------------------

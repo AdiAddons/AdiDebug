@@ -312,16 +312,16 @@ local function ShowUIObjectTooltip(obj)
 					tinsert(bools, label)
 				end
 			else
-				GameTooltip:AddDoubleLine(strmatch(getter, "^Get(%w+)$") or getter, Format(obj[getter](obj)))
+				GameTooltip:AddDoubleLine(strmatch(getter, "^Get(%w+)$") or getter, Format(obj[getter](obj)), nil, nil, nil, 1, 1, 1)
 			end
 		end
 	end
 	if haveBools then
 		if #bools > 0 then
-			GameTooltip:AddDoubleLine("Flags", table.concat(bools, ", "))
+			GameTooltip:AddDoubleLine("Flags", table.concat(bools, ", "), nil, nil, nil, 1, 1, 1)
 			wipe(bools)
 		else
-			GameTooltip:AddDoubleLine("Flags", "-")
+			GameTooltip:AddDoubleLine("Flags", "-", nil, nil, nil, 1, 1, 1)
 		end
 	end
 end
@@ -329,15 +329,18 @@ end
 local function ShowTableTooltip(value)
 	local mt = getmetatable(value)
 	setmetatable(value, nil)
-	GameTooltip:AddDoubleLine("Metatable", AdiDebug:PrettyFormat(mt))
+	GameTooltip:AddDoubleLine("Metatable", AdiDebug:PrettyFormat(mt, true), nil, nil, nil, 1, 1, 1)
 	local n = 0
 	for k, v in pairs(value) do
+		if n == 0 then
+			GameTooltip:AddLine("Content:")
+		end
 		if n < 10 then
-			GameTooltip:AddDoubleLine(AdiDebug:PrettyFormat(k, true, 30), AdiDebug:PrettyFormat(v, true, 30))
+			GameTooltip:AddDoubleLine(AdiDebug:PrettyFormat(k, true, 30), AdiDebug:PrettyFormat(v, true, 30), 1, 1, 1, 1, 1, 1)
 		end
 		n = n + 1
 	end
-	if n >= 10 then
+	if n > 10 then
 		GameTooltip:AddLine(format("|cffaaaaaa%d more entries...|r", n-10))
 	end
 	setmetatable(value, mt)

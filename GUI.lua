@@ -154,14 +154,12 @@ local closeEntry = {
 }
 
 local function SortEntries(a, b) -- a < b
-	if a.__order and b.__order then
-		return a.__order < b.__order
-	elseif b.__order then
-		return b.__order > 0
-	elseif a.__order then
-		return a.__order <= 0
-	else
+	local orderA = a.__order or 0
+	local orderB = b.__order or 0
+	if orderA == orderB then
 		return a.text < b.text
+	else
+		return orderA < orderB
 	end
 end
 
@@ -169,6 +167,7 @@ function AdiDebugGUI:AddMenuStreamEntry(streamId)
 	local entry = setmetatable({
 		text = streamId,
 		value = streamId,
+		__categories = {}
 	}, streamEntryMeta)
 	self.menuStreamEntries[streamId] = entry
 	tinsert(self.menuList, entry)
@@ -185,10 +184,12 @@ function AdiDebugGUI:AddMenuCategoryEntry(streamId, category)
 		swatchFunc = function() AdiDebugGUI:SetCategoryColor(streamId, category, ColorPickerFrame:GetColorRGB()) end,
 		cancelFunc = function(values) AdiDebugGUI:SetCategoryColor(streamId, category, values.r, values.g, values.b) end,
 	}, categoryEntryMeta)
-	entry.r, entry.g, entry.b = unpack(self.db.profile.categoryColors[streamId][category]) 
+	entry.r, entry.g, entry.b = unpack(self.db.profile.categoryColors[streamId][category])
 	if category == streamId then
 		entry.__order = -10
 	end
+	streamEntry.__categories[category] = entry
+
 	if not streamEntry.menuList then
 		streamEntry.menuList = {
 			setmetatable({ value = streamId }, selectAllEntryMeta),
@@ -196,26 +197,36 @@ function AdiDebugGUI:AddMenuCategoryEntry(streamId, category)
 			closeEntry,
 		}
 	end
-	tinsert(streamEntry.menuList, entry)
-	if #streamEntry.menuList < 5 then
-		return
-	else
+
+	local menu = streamEntry
+	while #(menu.menuList) > 25 do
+		if not menu.__subMenu then
+			menu.__subMenu = {
+				text = "...",
+				notCheckable = true,
+				hasArrow = true,
+				order = 5,
+				menuList = { closeEntry }
+			}
+			tinsert(menu.menuList, menu.__subMenu)
+			table.sort(menu.menuList, SortEntries)
+		end
+		menu = menu.__subMenu
+	end
+	tinsert(menu.menuList, entry)
+	table.sort(menu.menuList, SortEntries)
+
+	if not streamEntry.hasArrow and #streamEntry.menuList > 4 then
 		streamEntry.hasArrow = true
 	end
-	table.sort(streamEntry.menuList, SortEntries)
 end
 
 function AdiDebugGUI:SetCategoryColor(streamId, category, r, g, b)
 	if not AdiDebug:HasStream(streamId) then return end
+	local entry = self.menuStreamEntries[streamId].__categories[category]
 	local c = self.db.profile.categoryColors[streamId][category]
 	c[1], c[2], c[3] = r, g, b
-	local streamEntry = self.menuStreamEntries[streamId]
-	for i, sub in pairs(streamEntry.menuList) do
-		if sub.value == category then
-			sub.r, sub.g, sub.b = r, g, b
-			break
-		end
-	end
+	entry.r, entry.g, entry.b = r, g, b
 	if streamId == self.currentStreamId then
 		self.Messages:UpdateColorByID(self:GetCategoryId(streamId, category), r, g, b)
 	end

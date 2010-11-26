@@ -259,7 +259,7 @@ end
 -- ----------------------------------------------------------------------------
 
 function AdiDebugGUI:OnMouseDown()
-	if not self.movingOrSizing and IsShiftKeyDown() then
+	if not self.movingOrSizing and IsModifierKeyDown() then
 		local x, y = GetCursorPosition()
 		local scale = self:GetEffectiveScale()
 		local left, bottom, width, height = self:GetRect()

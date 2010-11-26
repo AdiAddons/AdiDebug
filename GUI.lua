@@ -633,6 +633,7 @@ AdiDebugGUI:SetScript('OnEvent', function(self, event, name)
 				categoryColors = { ['*'] = { ['*'] = { 1, 1, 1 } } },
 				autoFadeOut = false,
 				opacity = 0.95,
+				shown = false,
 			}
 		}, true)
 

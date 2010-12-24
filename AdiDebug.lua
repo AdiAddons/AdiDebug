@@ -9,7 +9,7 @@ local addonName, ns = ...
 local AdiDebug = CreateFrame("Frame", "AdiDebug")
 AdiDebug.version = GetAddOnMetadata(addonName, "version")
 
-callbacks = LibStub('CallbackHandler-1.0'):New(AdiDebug)
+local callbacks = LibStub('CallbackHandler-1.0'):New(AdiDebug)
 
 local geterrorhandler, pcall = geterrorhandler, pcall
 local setmetatable, getmetatable = setmetatable, getmetatable

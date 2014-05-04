@@ -258,14 +258,14 @@ end
 -- Script handlers
 -- ----------------------------------------------------------------------------
 
-function AdiDebugGUI:OnMouseDown()
-	if not self.movingOrSizing and IsModifierKeyDown() then
+function AdiDebugGUI:OnMoverMouseDown()
+	if not self.movingOrSizing then
 		local x, y = GetCursorPosition()
 		local scale = self:GetEffectiveScale()
 		local left, bottom, width, height = self:GetRect()
 		x, y = (x / scale) - left, (y / scale) - bottom
-		local horiz = (x < 16) and "LEFT" or (x > width - 16) and "RIGHT"
-		local vert = (y < 16) and "BOTTOM" or (y > height - 16) and "TOP"
+		local horiz = (x < 24) and "LEFT" or (x > width - 24) and "RIGHT"
+		local vert = (y < 24) and "BOTTOM" or (y > height - 24) and "TOP"
 		if horiz or vert then
 			self:StartSizing(strjoin("", vert or "", horiz or ""))
 		else
@@ -275,13 +275,14 @@ function AdiDebugGUI:OnMouseDown()
 	end
 end
 
-function AdiDebugGUI:OnMouseUp()
+function AdiDebugGUI:OnMoverMouseUp()
 	if self.movingOrSizing then
 		self.movingOrSizing = nil
 		self:StopMovingOrSizing()
-		self.db.profile.width, self.db.profile.height = self:GetSize()
+		local profile = self.db.profile
+		profile.width, profile.height = self:GetSize()
 		local _
-		_, _, self.db.profile.point, self.db.profile.xOffset, self.db.profile.yOffset = self:GetPoint()
+		_, _, profile.point, profile.xOffset, profile.yOffset = self:GetPoint()
 	end
 end
 
@@ -483,8 +484,6 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 	self:SetToplevel(true)
 	self:SetMinResize(300, 120)
 	self:EnableMouse(true)
-	self:SetScript('OnMouseDown', self.OnMouseDown)
-	self:SetScript('OnMouseUp', self.OnMouseUp)
 	self:SetScript('OnShow', self.OnShow)
 	self:SetScript('OnHide', self.OnHide)
 
@@ -508,6 +507,19 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 		target:SetScript('OnEnter', ShowTooltipText)
 		target:SetScript('OnLeave', GameTooltip_Hide)
 	end
+
+	----- Moving helper -----
+
+	local mover = CreateFrame("Frame", nil, self)
+	mover:SetFrameLevel(200)
+	mover:SetAllPoints(self)
+	mover:Hide()
+	mover:EnableMouse(true)
+	mover:RegisterEvent('MODIFIER_STATE_CHANGED')
+	mover:SetScript('OnEvent', function() mover:SetShown(IsModifierKeyDown()) end)
+	mover:SetScript('OnMouseDown', function(_, ...) return self:OnMoverMouseDown(...) end)
+	mover:SetScript('OnMouseUp', function(_, ...) return self:OnMoverMouseUp(...) end)
+	AttachTooltip(mover, "Drag the borders and corners to resize the frame.\nDrag the center to move the frame.")
 
 	----- Close button -----
 

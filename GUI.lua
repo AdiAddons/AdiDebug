@@ -64,6 +64,8 @@ end
 function AdiDebugGUI:AddMessage(category, timestamp, text)
 	if not self.db.profile.categories[self.currentStreamId][category] then
 		return
+	elseif self.searchText ~= nil and not strmatch(text, self.searchText) then
+		return
 	end
 	if timestamp ~= self.currentTimestamp then
 		self.Messages:AddMessage(strjoin("", "----- ", date("%X", timestamp), strsub(format("%.3f", timestamp % 1), 2)), 0.6, 0.6, 0.6)
@@ -609,6 +611,24 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 	opacitySlider:SetValue(self.db.profile.opacity)
 	opacitySlider:SetScript('OnValueChanged', function(_, value) self.db.profile.opacity = value end)
 	AttachTooltip(opacitySlider, "Frame opacity\nAdjust the self opacity.\nThis is the lowest opacity if auto fading is enabled else it is the self opacity.")
+
+	----- Text search -----
+
+	local searchBox = CreateFrame("EditBox", nil, self, "SearchBoxTemplate")
+	searchBox:SetSize(130, 20)
+	searchBox:SetPoint("TOPRIGHT", opacitySlider, "TOPLEFT", -10, 4)
+	searchBox:SetScript('OnTextChanged', function()
+		local text = strtrim(searchBox:GetText())
+		if text == "" or text == SEARCH then
+			text = nil
+		end
+		if text ~= self.searchText then
+			self.searchText = text
+			self:RefreshMessages()
+		end
+	end)
+
+	AttachTooltip(searchBox, "Enter text to search in the logs.")
 
 	-- Register callbacks
 	AdiDebug.RegisterCallback(self, "AdiDebug_NewStream")

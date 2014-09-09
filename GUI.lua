@@ -289,12 +289,7 @@ function AdiDebugGUI:OnMoverMouseUp()
 end
 
 function AdiDebugGUI:OnShow()
-	self.db.profile.shown = true
 	self:UpdateScrollBar()
-end
-
-function AdiDebugGUI:OnHide()
-	self.db.profile.shown = false
 end
 
 -- ----------------------------------------------------------------------------
@@ -487,7 +482,6 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 	self:SetMinResize(300, 120)
 	self:EnableMouse(true)
 	self:SetScript('OnShow', self.OnShow)
-	self:SetScript('OnHide', self.OnHide)
 
 	----- Background -----
 
@@ -668,6 +662,10 @@ AdiDebugGUI:SetScript('OnEvent', function(self, event, name)
 				shown = false,
 			}
 		}, true)
+
+		self.db:RegisterCallback('OnDatabaseShutdown', function()
+			self.db.profile.shown = self:IsShown()
+		end)
 
 		if self.db.profile.shown then
 			self:Show()

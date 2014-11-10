@@ -108,7 +108,7 @@ end
 -- ----------------------------------------------------------------------------
 
 local function BuildHyperLink(t)
-	local name, valueType = AdiDebug:GetTableName(t), AdiDebug:GetSmartType(t)
+	local name, valueType = tostring(AdiDebug:GetTableName(t)), AdiDebug:GetSmartType(t)
 	return format("|cff%s|HAdiDebug%s:%s|h[%s]|h|r", AdiDebug.hexColors[valueType], valueType, name, name)
 end
 

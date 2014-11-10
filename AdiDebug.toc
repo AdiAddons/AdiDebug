@@ -6,7 +6,7 @@
 ## Version: @project-version@
 ## SavedVariables: AdiDebugDB
 ## X-Date: @project-date-iso@
-## OptionalDeps: Ace3, tekDebug
+## OptionalDeps: Ace3, tekDebug, !BugGrabber
 ## LoadOnDemand: 1
 ## LoadWith: tekDebug
 

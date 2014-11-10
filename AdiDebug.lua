@@ -365,3 +365,42 @@ local frames = setmetatable({}, {__index = function(t, name)
 end})
 
 tekDebug = { GetFrame = function(_, name) return frames[name] end }
+
+-- ----------------------------------------------------------------------------
+-- Display errors caught by BugGrabber
+-- ----------------------------------------------------------------------------
+
+if _G.BugGrabber then
+	local errorStream
+
+	local function GetErrorCategory(...)
+		local category
+		for i = 1, select('#', ...) do
+			local line = strtrim(select(i, ...) or "")
+			if not category and (strmatch(line, 'Interface\\FrameXML') or strmatch(line, 'Interface\\AddOns\\Blizzard_')) then
+				category = 'Blizzard'
+			else
+				local addon = strmatch(line, 'Interface\\AddOns\\([^\\]+)')
+				if addon and not strmatch(line, '\\libs\\') and not strmatch(addon, '^Blizzard_') then
+					return addon
+				end
+			end
+		end
+		return category
+	end
+
+	function AdiDebug:BugGrabber_BugGrabbed(_, err)
+		if not errorStream then
+			errorStream = '|cffff0000ERRORS|r'
+			RegisterStream(errorStream)
+		end
+		local category = GetErrorCategory(err.message, strsplit(err.stack, "\n"))
+		if category and streams[category] then
+			return Sink(category, errorStream, err.message, err.stack)
+		else
+			return Sink(errorStream, category or errorStream, err.message, err.stack)
+		end
+	end
+
+	_G.BugGrabber.RegisterCallback(AdiDebug, 'BugGrabber_BugGrabbed')
+end

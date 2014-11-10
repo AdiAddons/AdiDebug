@@ -278,7 +278,7 @@ local function Sink(streamId, category, ...)
 		message[1], message[2], message[3] = category, now, text
 	end
 	tinsert(stream, message)
-	for i = 500, #stream do
+	for i = 2000, #stream do
 		tinsert(heap, tremove(stream, 1))
 	end
 	if category ~= streamId and not categories[streamId][category] then

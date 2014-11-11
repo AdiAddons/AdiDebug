@@ -89,9 +89,9 @@ end
 function AdiDebugGUI:SelectStream(streamId)
 	if not AdiDebug:HasStream(streamId) then return end
 	self.db.profile.streamId = streamId
+	self.Selector.Text:SetText(streamId or "")
 	if streamId == self.currentStreamId then return end
 	self.currentStreamId = streamId
-	self.Selector.Text:SetText(streamId or "")
 	self:RefreshMessages()
 	return true
 end
@@ -100,31 +100,36 @@ end
 -- Selector menu handling
 -- ----------------------------------------------------------------------------
 
-local streamEntryMeta = { __index = {
-	checked = function(button)
-		return AdiDebugGUI.currentStreamId and button.value == AdiDebugGUI.currentStreamId
-	end,
-	func = function(button)
-		AdiDebugGUI:SelectStream(button.value)
-	end,
-}}
+local function CategoryEntry_IsChecked(button)
+	return AdiDebugGUI.db.profile.categories[button.arg1][button.value]
+end
 
-local categoryEntryMeta = { __index = {
-	isNotRadio = true,
-	keepShownOnClick = true,
-	hasColorSwatch = true,
-	checked = function(button)
-		return AdiDebugGUI.db.profile.categories[button.arg1][button.value]
-	end,
-	func = function(button, streamId, _, checked)
-		AdiDebugGUI.db.profile.categories[button.arg1][button.value] = checked
-		if streamId == AdiDebugGUI.currentStreamId then
-			AdiDebugGUI:RefreshMessages()
-		end
-	end,
-}}
+local function CategoryEntry_OnClick(button, streamId, _, checked)
+	AdiDebugGUI.db.profile.categories[streamId][button.value] = checked
+	if streamId == AdiDebugGUI.currentStreamId then
+		AdiDebugGUI:RefreshMessages()
+	end
+end
 
-local function SetAllCategories(streamId, shown)
+local function CategoryEntry_SetColor(streamId, category, r, g, b)
+	if not AdiDebug:HasStream(streamId) then return end
+	local c = AdiDebug.db.profile.categoryColors[streamId][category]
+	c[1], c[2], c[3] = r, g, b
+	if streamId == AdiDebugGUI.currentStreamId then
+		AdiDebugGUI.Messages:UpdateColorByID(AdiDebugGUI:GetCategoryId(streamId, category), r, g, b)
+	end
+end
+
+local function StreamEntry_IsChecked(button)
+	return button.value == AdiDebugGUI.currentStreamId
+end
+
+local function StreamEntry_OnClick(button)
+	return AdiDebugGUI:SelectStream(button.value)
+end
+
+local function StreamEntry_SetAllSelected(button, shown)
+	local streamId = button.value
 	local db = AdiDebugGUI.db.profile.categories[streamId]
 	db[streamId] = shown
 	for category in AdiDebug:IterateCategories(streamId) do
@@ -135,103 +140,80 @@ local function SetAllCategories(streamId, shown)
 	end
 end
 
-local selectAllEntryMeta = { __index = {
-	text = "Select all",
-	notCheckable = true,
-	__order = 10,
-	func = function(button) SetAllCategories(button.value, true) end,
-}}
+local info
+local entries = {}
 
-local unselectAllEntryMeta = { __index = {
-	text = "Unselect all",
-	notCheckable = true,
-	__order = 20,
-	func = function(button) SetAllCategories(button.value, false) end,
-}}
-
-local closeEntry = {
-	text = "Close menu",
-	notCheckable = true,
-	__order = 30,
-}
-
-local function SortEntries(a, b) -- a < b
-	local orderA = a.__order or 0
-	local orderB = b.__order or 0
-	if orderA == orderB then
-		return a.text < b.text
-	else
-		return orderA < orderB
+local function AddCategoryButtons(streamId)
+	wipe(entries)
+	for category in AdiDebug:IterateCategories(streamId) do
+		tinsert(entries, category)
 	end
-end
+	table.sort(entries)
+	tinsert(entries, 1, streamId)
 
-function AdiDebugGUI:AddMenuStreamEntry(streamId)
-	local entry = setmetatable({
-		text = streamId,
-		value = streamId,
-		__categories = {}
-	}, streamEntryMeta)
-	self.menuStreamEntries[streamId] = entry
-	tinsert(self.menuList, entry)
-	table.sort(self.menuList, SortEntries)
-	self:AddMenuCategoryEntry(streamId, streamId)
-end
+	info.func = CategoryEntry_OnClick
+	info.checked = CategoryEntry_IsChecked
+	info.keepShownOnClick = true
+	info.hasColorSwatch = true
+	info.isNotRadio = true
+	info.arg1 = streamId
 
-function AdiDebugGUI:AddMenuCategoryEntry(streamId, category)
-	local streamEntry = self.menuStreamEntries[streamId]
-	local entry = setmetatable({
-		text = category,
-		value = category,
-		arg1 = streamId,
-		swatchFunc = function() AdiDebugGUI:SetCategoryColor(streamId, category, ColorPickerFrame:GetColorRGB()) end,
-		cancelFunc = function(values) AdiDebugGUI:SetCategoryColor(streamId, category, values.r, values.g, values.b) end,
-	}, categoryEntryMeta)
-	entry.r, entry.g, entry.b = unpack(self.db.profile.categoryColors[streamId][category])
-	if category == streamId then
-		entry.__order = -10
-	end
-	streamEntry.__categories[category] = entry
-
-	if not streamEntry.menuList then
-		streamEntry.menuList = {
-			setmetatable({ value = streamId }, selectAllEntryMeta),
-			setmetatable({ value = streamId }, unselectAllEntryMeta),
-			closeEntry,
-		}
-	end
-
-	local menu = streamEntry
-	while #(menu.menuList) > 25 do
-		if not menu.__subMenu then
-			menu.__subMenu = {
-				text = "...",
-				notCheckable = true,
-				hasArrow = true,
-				order = 5,
-				menuList = { closeEntry }
-			}
-			tinsert(menu.menuList, menu.__subMenu)
-			table.sort(menu.menuList, SortEntries)
+	for i, category in ipairs(entries) do
+		local category = category
+		info.text = category
+		info.r, info.g, info.b = unpack(AdiDebugGUI.db.profile.categoryColors[streamId][category])
+		info.swatchFunc = function()
+			CategoryEntry_SetColor(streamId, category, ColorPickerFrame:GetColorRGB())
 		end
-		menu = menu.__subMenu
+		info.cancelFunc = function(values)
+			CategoryEntry_SetColor(streamId, category, values.r, values.g, values.b)
+		end
+		UIDropDownMenu_AddButton(info, 2)
 	end
-	tinsert(menu.menuList, entry)
-	table.sort(menu.menuList, SortEntries)
 
-	if not streamEntry.hasArrow and #streamEntry.menuList > 4 then
-		streamEntry.hasArrow = true
+	wipe(info)
+	info.text = "Select all"
+	info.value = streamId
+	info.notCheckable = true
+	info.arg1 = true
+	info.func = StreamEntry_SetAllSelected
+	UIDropDownMenu_AddButton(info, 2)
+
+	info.text = "Unselect all"
+	info.arg1 = false
+	UIDropDownMenu_AddButton(info, 2)
+end
+
+local function AddStreamButtons()
+	wipe(entries)
+	for streamId in AdiDebug:IterateStreams() do
+		tinsert(entries, streamId)
+	end
+	table.sort(entries)
+
+	info.checked = StreamEntry_IsChecked
+	info.func = StreamEntry_OnClick
+	info.hasArrow = true
+	for i, streamId in ipairs(entries) do
+		info.text = streamId
+		UIDropDownMenu_AddButton(info, 1)
 	end
 end
 
-function AdiDebugGUI:SetCategoryColor(streamId, category, r, g, b)
-	if not AdiDebug:HasStream(streamId) then return end
-	local entry = self.menuStreamEntries[streamId].__categories[category]
-	local c = self.db.profile.categoryColors[streamId][category]
-	c[1], c[2], c[3] = r, g, b
-	entry.r, entry.g, entry.b = r, g, b
-	if streamId == self.currentStreamId then
-		self.Messages:UpdateColorByID(self:GetCategoryId(streamId, category), r, g, b)
+local function InitializeStreamDropdown(frame, level)
+	if not AdiDebugGUI.db then return end
+	info = UIDropDownMenu_CreateInfo()
+
+	if level == 1 then
+		AddStreamButtons()
+	elseif level == 2 then
+		AddCategoryButtons(UIDROPDOWNMENU_MENU_VALUE, level)
 	end
+
+	wipe(info)
+	info.text = "Close Menu"
+	info.notCheckable = true
+	UIDropDownMenu_AddButton(info, level)
 end
 
 -- ----------------------------------------------------------------------------
@@ -239,14 +221,9 @@ end
 -- ----------------------------------------------------------------------------
 
 function AdiDebugGUI:AdiDebug_NewStream(event, streamId)
-	self:AddMenuStreamEntry(streamId)
 	if not self.currentStreamId and streamId == self.db.profile.streamId then
 		self:SelectStream(streamId)
 	end
-end
-
-function AdiDebugGUI:AdiDebug_NewCategory(event, streamId, category)
-	self:AddMenuCategoryEntry(streamId, category)
 end
 
 function AdiDebugGUI:AdiDebug_NewMessage(event, streamId, category, now, text)
@@ -526,19 +503,17 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 
 	----- Stream selector -----
 
-	local menuFrame = CreateFrame("Frame", "AdiDebugDropdownMenu", nil, "UIDropDownMenuTemplate")
-	self.menuList = { closeEntry }
-	self.menuStreamEntries = {}
-
 	local selector = CreateFrame("Button", "AdiDebugDropdown", background, "UIDropDownMenuTemplate")
 	selector:SetPoint("TOPLEFT", -12, -4)
 	selector:SetWidth(145)
-	selector.Text = AdiDebugDropdownText
+	selector.Text = _G["AdiDebugDropdownText"]
 	AttachTooltip(selector, "Debugging stream\nSelect the debugging stream to watch.")
 	self.Selector = selector
 
-	AdiDebugDropdownButton:SetScript('OnClick', function()
-		return EasyMenu(self.menuList, menuFrame, "AdiDebugDropdown", 16, 8, "MENU")
+	local menuFrame = CreateFrame("Frame", "AdiDebugDropdownMenu", nil, "UIDropDownMenuTemplate")
+	UIDropDownMenu_Initialize(menuFrame, InitializeStreamDropdown, "MENU")
+	_G["AdiDebugDropdownButton"]:SetScript('OnClick', function()
+		return ToggleDropDownMenu(1, nil, menuFrame, "AdiDebugDropdown", 16, 8)
 	end)
 
 	----- Message area -----
@@ -626,17 +601,7 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 
 	-- Register callbacks
 	AdiDebug.RegisterCallback(self, "AdiDebug_NewStream")
-	AdiDebug.RegisterCallback(self, "AdiDebug_NewCategory")
 	AdiDebug.RegisterCallback(self, "AdiDebug_NewMessage")
-
-	-- Fetch existing streams and categories
-	for streamId in AdiDebug:IterateStreams() do
-		self:AdiDebug_NewStream('Initialize', streamId)
-		for category in AdiDebug:IterateCategories(streamId) do
-			self:AdiDebug_NewCategory('Initialize', streamId, category)
-		end
-	end
-
 end)
 
 -- ----------------------------------------------------------------------------

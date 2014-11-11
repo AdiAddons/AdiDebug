@@ -143,7 +143,7 @@ end
 local info
 local entries = {}
 
-local function AddCategoryButtons(streamId)
+local function BuildCategoryButtons(streamId)
 	wipe(entries)
 	for category in AdiDebug:IterateCategories(streamId) do
 		tinsert(entries, category)
@@ -151,6 +151,22 @@ local function AddCategoryButtons(streamId)
 	table.sort(entries)
 	tinsert(entries, 1, streamId)
 
+	return #entries
+end
+
+local function AddPartitionButtons(streamId, numParts, partitionSize, count)
+	info.hasArrow = true
+	info.notCheckable = true
+	for i = 1, numParts do
+		local firstIndex = 1 + (i - 1) * partitionSize
+		local lastIndex = math.min(count, i * partitionSize)
+		info.text = entries[firstIndex].." .. "..entries[lastIndex]
+		info.value = { streamId, firstIndex, lastIndex }
+		UIDropDownMenu_AddButton(info, 2)
+	end
+end
+
+local function AddCategoryButtons(level, streamId, firstIndex, lastIndex)
 	info.func = CategoryEntry_OnClick
 	info.checked = CategoryEntry_IsChecked
 	info.keepShownOnClick = true
@@ -158,8 +174,8 @@ local function AddCategoryButtons(streamId)
 	info.isNotRadio = true
 	info.arg1 = streamId
 
-	for i, category in ipairs(entries) do
-		local category = category
+	for i = firstIndex, lastIndex do
+		local category = entries[i]
 		info.text = category
 		info.r, info.g, info.b = unpack(AdiDebugGUI.db.profile.categoryColors[streamId][category])
 		info.swatchFunc = function()
@@ -168,9 +184,11 @@ local function AddCategoryButtons(streamId)
 		info.cancelFunc = function(values)
 			CategoryEntry_SetColor(streamId, category, values.r, values.g, values.b)
 		end
-		UIDropDownMenu_AddButton(info, 2)
+		UIDropDownMenu_AddButton(info, level)
 	end
+end
 
+local function AddSelectAllEntries(streamId)
 	wipe(info)
 	info.text = "Select all"
 	info.value = streamId
@@ -200,6 +218,20 @@ local function AddStreamButtons()
 	end
 end
 
+local function AddFirstLevelCategories(streamId)
+	local count = BuildCategoryButtons(streamId)
+	local numParts = 1 + math.floor(count / 15)
+	if numParts > 1 then
+		local partitionSize = math.ceil(count / numParts)
+		AddPartitionButtons(streamId, numParts, partitionSize, count)
+	else
+		AddCategoryButtons(2, streamId, 1, count)
+	end
+	if count > 1 then
+		AddSelectAllEntries(streamId)
+	end
+end
+
 local function InitializeStreamDropdown(frame, level)
 	if not AdiDebugGUI.db then return end
 	info = UIDropDownMenu_CreateInfo()
@@ -207,7 +239,9 @@ local function InitializeStreamDropdown(frame, level)
 	if level == 1 then
 		AddStreamButtons()
 	elseif level == 2 then
-		AddCategoryButtons(UIDROPDOWNMENU_MENU_VALUE, level)
+		AddFirstLevelCategories(UIDROPDOWNMENU_MENU_VALUE)
+	elseif level == 3 then
+		AddCategoryButtons(level, unpack(UIDROPDOWNMENU_MENU_VALUE))
 	end
 
 	wipe(info)

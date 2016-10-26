@@ -18,7 +18,7 @@ local ALPHA_DELAY = 0.25
 
 function AdiDebugGUI:UpdateScrollBar()
 	if self.safetyLock then return end
-	local numMessages, displayed = self.Messages:GetNumMessages(), self.Messages:GetNumLinesDisplayed()
+	local numMessages, displayed = self.Messages:GetNumMessages(), self.Messages:GetNumVisibleLines()
 	local newMax = max(0, numMessages - displayed)
 	local scrollBar = self.ScrollBar
 	if newMax > 0 then
@@ -26,7 +26,7 @@ function AdiDebugGUI:UpdateScrollBar()
 		if newMax ~= select(2, scrollBar:GetMinMaxValues()) then
 			scrollBar:SetMinMaxValues(0, newMax)
 		end
-		local offset = max(0, newMax - self.Messages:GetCurrentScroll())
+		local offset = max(0, newMax - self.Messages:GetScrollOffset())
 		if offset ~=scrollBar:GetValue() then
 			scrollBar:SetValue(offset)
 		end
@@ -43,7 +43,7 @@ function AdiDebugGUI:SetVerticalScroll(value)
 	if self.safetyLock then return end
 	local _, maxVal = self.ScrollBar:GetMinMaxValues()
 	local offset = maxVal - value
-	if self.Messages:GetCurrentScroll() ~= offset then
+	if self.Messages:GetScrollOffset() ~= offset then
 		self.safetyLock = true
 		self.Messages:SetScrollOffset(offset)
 		self.safetyLock = false
@@ -315,18 +315,18 @@ local getters = {
 	-- VisibleRegion
 	"GetAlpha", "IsShown", "IsVisible",
 	-- Frame
-	"GetFrameStrata",	"GetFrameLevel", "GetScale", "GetID", "GetNumChildren", "GetNumRegions",
-  "GetPropagateKeyboardInput", "IsClampedToScreen", "IsJoystickEnabled", "IsKeyboardEnabled", "IsMouseEnabled",
+	"GetFrameStrata", "GetFrameLevel", "GetScale", "GetID", "GetNumChildren", "GetNumRegions",
+	"GetPropagateKeyboardInput", "IsClampedToScreen", "IsJoystickEnabled", "IsKeyboardEnabled", "IsMouseEnabled",
 	"IsMouseWheelEnabled", "IsMovable", "IsResizable", "IsToplevel", "IsUserPlaced",
 	"GetBackdrop", "GetBackdropBorderColor", "GetBackdropColor",
 	-- Button
-	"GetButtonState",	"GetMotionScriptsWhileDisabled", "GetTextHeight", "GetTextWidth", "IsEnabled",
+	"GetButtonState", "GetMotionScriptsWhileDisabled", "GetTextHeight", "GetTextWidth", "IsEnabled",
 	"GetDisabledTexture", "GetDisabledFontObject", "GetFontString", "GetHighlightFontObject", "GetHighlightTexture",
 	"GetNormalFontObject", "GetNormalTexture", "GetPushedTextOffset", "GetPushedTexture",
 	-- CheckButton
 	"GetChecked",
 	-- ScrollFrame
-	"GetHorizontalScroll", "GetHorizontalScrollRange","GetVerticalScroll", "GetVerticalScrollRange", "GetScrollChild",
+	"GetHorizontalScroll", "GetHorizontalScrollRange", "GetVerticalScroll", "GetVerticalScrollRange", "GetScrollChild",
 	-- Slider
 	"GetMinMaxValues", "GetOrientation", "GetThumbTexture", "GetValue", "GetValueStep",
 	-- StatusBar
@@ -432,9 +432,9 @@ local function Messages_OnHyperlinkEnter(self, data, link)
 end
 
 local function Messages_OnMouseWheel(self, delta)
-	local num, displayed = self:GetNumMessages(), self:GetNumLinesDisplayed()
+	local num, displayed = self:GetNumMessages(), self:GetNumVisibleLines()
 	local step = IsShiftKeyDown() and num or IsControlKeyDown() and displayed or 1
-	local current = self:GetCurrentScroll()
+	local current = self:GetScrollOffset()
 	local newOffset = min(max(0, current + step * delta), num - displayed)
 	if newOffset ~= current then
 		self:SetScrollOffset(newOffset)
@@ -566,8 +566,8 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 	messages:SetHyperlinksEnabled(true)
 	messages:EnableMouseWheel(true)
 	local UpdateScrollBar = function() self:UpdateScrollBar() end
-	messages:SetScript('OnMessageScrollChanged', UpdateScrollBar)
-	messages:SetScript('OnSizeChanged', UpdateScrollBar)
+	--messages:SetScript('OnMessageScrollChanged', UpdateScrollBar)
+	--messages:SetScript('OnSizeChanged', UpdateScrollBar)
 	messages:SetScript('OnHyperlinkClick', Messages_OnHyperlinkClick)
 	messages:SetScript('OnHyperlinkEnter', Messages_OnHyperlinkEnter)
 	messages:SetScript('OnHyperlinkLeave', GameTooltip_Hide)

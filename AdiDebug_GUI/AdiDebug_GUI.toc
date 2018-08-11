@@ -1,4 +1,4 @@
-## Interface: 60000
+## Interface: 80000
 
 ## Title: AdiDebug - GUI
 ## Notes: Adirelle's debug frame - graphical user interface.

@@ -520,16 +520,18 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 	local mover = CreateFrame("Frame", nil, self)
 	mover:SetFrameLevel(200)
 	mover:SetAllPoints(self)
-	mover:Hide()
-	mover:RegisterEvent('MODIFIER_STATE_CHANGED')
-	mover:SetScript('OnEvent', function()
+	mover.Update = function()
 		local enable = IsModifierKeyDown()
 		mover:EnableMouse(enable)
 		mover:SetShown(enable)
-	end)
+	end
+	mover:RegisterEvent('MODIFIER_STATE_CHANGED')
+	mover:SetScript('OnEvent', mover.Update)
+	mover:SetScript('OnShow', mover.Update)
 	mover:SetScript('OnMouseDown', function(_, ...) return self:OnMoverMouseDown(...) end)
 	mover:SetScript('OnMouseUp', function(_, ...) return self:OnMoverMouseUp(...) end)
 	AttachTooltip(mover, "Drag the borders and corners to resize the frame.\nDrag the center to move the frame.")
+	mover.Update()
 
 	----- Close button -----
 

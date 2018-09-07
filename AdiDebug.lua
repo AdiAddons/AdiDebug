@@ -394,7 +394,7 @@ if _G.BugGrabber then
 			errorStream = '|cffff0000ERRORS|r'
 			RegisterStream(errorStream)
 		end
-		local category = GetErrorCategory(err.message, strsplit(err.stack, "\n"))
+		local category = GetErrorCategory(err.message, strsplit(err.stack or "", "\n"))
 		if category and streams[category] then
 			return Sink(category, errorStream, err.message, err.stack)
 		else

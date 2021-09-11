@@ -565,9 +565,7 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 	messages:SetIndentedWordWrap(true)
 	messages:SetHyperlinksEnabled(true)
 	messages:EnableMouseWheel(true)
-	local UpdateScrollBar = function() self:UpdateScrollBar() end
-	--messages:SetScript('OnMessageScrollChanged', UpdateScrollBar)
-	--messages:SetScript('OnSizeChanged', UpdateScrollBar)
+
 	messages:SetScript('OnHyperlinkClick', Messages_OnHyperlinkClick)
 	messages:SetScript('OnHyperlinkEnter', Messages_OnHyperlinkEnter)
 	messages:SetScript('OnHyperlinkLeave', GameTooltip_Hide)
@@ -577,13 +575,19 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 
 	----- Scroll bar -----
 
-	local scrollBar = CreateFrame("Slider", nil, background, "UIPanelScrollBarTemplate")
-	scrollBar:Hide()
-	scrollBar:SetPoint("TOPRIGHT", self, "TOPRIGHT", -8, -44)
-	scrollBar:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -8, 24)
+	local scrollBar = CreateFrame('Slider', nil, background, 'UIPanelScrollBarTemplate')
+	scrollBar:SetPoint('TOPRIGHT', self, -8, -44)
+	scrollBar:SetPoint('BOTTOMRIGHT', self, -8, 24)
+	scrollBar:SetMinMaxValues(0, 1)
 	scrollBar:SetValueStep(1)
-	scrollBar.scrollStep = 3
-	scrollBar:GetParent().SetVerticalScroll = function(_, value) self:SetVerticalScroll(value) end
+	scrollBar.scrollStep = 3 -- for the scroll buttons
+	scrollBar:SetObeyStepOnDrag(true)
+
+	scrollBar:SetScript('OnValueChanged', function(_, value)
+		local _, maxValue = scrollBar:GetMinMaxValues()
+		messages:SetScrollOffset(maxValue - value)
+	end)
+
 	self.ScrollBar = scrollBar
 
 	----- Auto fade button -----

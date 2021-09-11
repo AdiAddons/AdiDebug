@@ -618,6 +618,8 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 	searchBox:SetSize(130, 20)
 	searchBox:SetPoint("TOPRIGHT", opacitySlider, "TOPLEFT", -10, 4)
 	searchBox:SetScript('OnTextChanged', function()
+		SearchBoxTemplate_OnTextChanged(searchBox)
+
 		local text = strtrim(searchBox:GetText())
 		if text == "" or text == SEARCH then
 			text = nil

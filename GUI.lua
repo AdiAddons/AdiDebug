@@ -39,17 +39,6 @@ function AdiDebugGUI:UpdateScrollBar()
 	end
 end
 
-function AdiDebugGUI:SetVerticalScroll(value)
-	if self.safetyLock then return end
-	local _, maxVal = self.ScrollBar:GetMinMaxValues()
-	local offset = maxVal - value
-	if self.Messages:GetCurrentScroll() ~= offset then
-		self.safetyLock = true
-		self.Messages:SetScrollOffset(offset)
-		self.safetyLock = false
-	end
-end
-
 local id = 0
 local categoryIds = setmetatable({}, {__index = function(t,k)
 	id = id + 1
@@ -570,8 +559,6 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 	messages:SetIndentedWordWrap(true)
 	messages:SetHyperlinksEnabled(true)
 	messages:EnableMouseWheel(true)
-	local UpdateScrollBar = function() self:UpdateScrollBar() end
-	messages:SetOnScrollChangedCallback(UpdateScrollBar)
 	messages:SetScript('OnSizeChanged', UpdateScrollBar)
 	messages:SetScript('OnHyperlinkClick', Messages_OnHyperlinkClick)
 	messages:SetScript('OnHyperlinkEnter', Messages_OnHyperlinkEnter)
@@ -587,8 +574,14 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 	scrollBar:SetPoint("TOPRIGHT", self, "TOPRIGHT", -8, -44)
 	scrollBar:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -8, 24)
 	scrollBar:SetValueStep(1)
+	scrollBar:SetObeyStepOnDrag(true)
 	scrollBar.scrollStep = 3
-	scrollBar:GetParent().SetVerticalScroll = function(_, value) self:SetVerticalScroll(value) end
+
+	scrollBar:SetScript('OnValueChanged', function (_, value)
+		local _, maxValue = scrollBar:GetMinMaxValues()
+		messages:SetScrollOffset(maxValue - value)
+	end)
+
 	self.ScrollBar = scrollBar
 
 	----- Auto fade button -----

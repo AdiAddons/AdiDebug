@@ -496,7 +496,7 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 
 	----- Background -----
 
-	local background = CreateFrame("Frame", nil, self)
+	local background = CreateFrame("Frame", nil, self, 'BackdropTemplate')
 	background:SetAllPoints(self)
 	background:SetBackdrop({
 		bgFile = [[Interface\Addons\AdiDebug\media\white16x16]], tile = true, tileSize = 16,
@@ -598,7 +598,7 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 
 	----- Opacity slider -----
 
-	local opacitySlider = CreateFrame("Slider", nil, background)
+	local opacitySlider = CreateFrame("Slider", nil, background, 'BackdropTemplate')
 	opacitySlider:SetSize(80, 16)
 	opacitySlider:EnableMouse(true)
 	opacitySlider:SetOrientation("HORIZONTAL")

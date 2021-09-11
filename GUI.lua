@@ -603,16 +603,8 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 
 	----- Opacity slider -----
 
-	local opacitySlider = CreateFrame("Slider", nil, background, 'BackdropTemplate')
+	local opacitySlider = CreateFrame("Slider", nil, self, 'HorizontalSliderTemplate')
 	opacitySlider:SetSize(80, 16)
-	opacitySlider:EnableMouse(true)
-	opacitySlider:SetOrientation("HORIZONTAL")
-	opacitySlider:SetBackdrop({
-		bgFile = [[Interface\Buttons\UI-SliderBar-Background]], tile = true, tileSize = 8,
-		edgeFile = [[Interface\Buttons\UI-SliderBar-Border]], edgeSize = 8,
-		insets = { left = 3, right = 3, top = 6, bottom = 6 }
-	})
-	opacitySlider:SetThumbTexture([[Interface\Buttons\UI-SliderBar-Button-Horizontal]])
 	opacitySlider:SetPoint("TOPRIGHT", -64, -8)
 	opacitySlider:SetValueStep(0.05)
 	opacitySlider:SetMinMaxValues(0.1, 0.95)

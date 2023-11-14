@@ -479,7 +479,7 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 	self:SetResizable(true)
 	self:SetFrameStrata("FULLSCREEN_DIALOG")
 	self:SetToplevel(true)
-	self:SetMinResize(300, 120)
+	self:SetResizeBounds(300, 120)
 	self:EnableMouse(true)
 	self:SetScript('OnShow', self.OnShow)
 
@@ -596,7 +596,7 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 
 	----- Opacity slider -----
 
-	local opacitySlider = CreateFrame("Slider", nil, self, 'HorizontalSliderTemplate')
+	local opacitySlider = CreateFrame("Slider", nil, self, 'UISliderTemplate')
 	opacitySlider:SetSize(80, 16)
 	opacitySlider:SetPoint("TOPRIGHT", -64, -8)
 	opacitySlider:SetValueStep(0.05)

@@ -102,10 +102,15 @@ end
 
 local function CategoryEntry_SetColor(streamId, category, r, g, b)
 	if not AdiDebug:HasStream(streamId) then return end
-	local c = AdiDebug.db.profile.categoryColors[streamId][category]
+	local c = AdiDebugGUI.db.profile.categoryColors[streamId][category]
 	c[1], c[2], c[3] = r, g, b
 	if streamId == AdiDebugGUI.currentStreamId then
-		AdiDebugGUI.Messages:UpdateColorByID(AdiDebugGUI:GetCategoryId(streamId, category), r, g, b)
+		local categoryId = AdiDebugGUI:GetCategoryId(streamId, category)
+		AdiDebugGUI.Messages:AdjustMessageColors(function (_, _, _, _, messageId)
+			if messageId == categoryId then
+				return true, r, g, b
+			end
+		end)
 	end
 end
 

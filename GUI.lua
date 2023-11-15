@@ -39,17 +39,6 @@ function AdiDebugGUI:UpdateScrollBar()
 	end
 end
 
-function AdiDebugGUI:SetVerticalScroll(value)
-	if self.safetyLock then return end
-	local _, maxVal = self.ScrollBar:GetMinMaxValues()
-	local offset = maxVal - value
-	if self.Messages:GetCurrentScroll() ~= offset then
-		self.safetyLock = true
-		self.Messages:SetScrollOffset(offset)
-		self.safetyLock = false
-	end
-end
-
 local id = 0
 local categoryIds = setmetatable({}, {__index = function(t,k)
 	id = id + 1
@@ -113,10 +102,15 @@ end
 
 local function CategoryEntry_SetColor(streamId, category, r, g, b)
 	if not AdiDebug:HasStream(streamId) then return end
-	local c = AdiDebug.db.profile.categoryColors[streamId][category]
+	local c = AdiDebugGUI.db.profile.categoryColors[streamId][category]
 	c[1], c[2], c[3] = r, g, b
 	if streamId == AdiDebugGUI.currentStreamId then
-		AdiDebugGUI.Messages:UpdateColorByID(AdiDebugGUI:GetCategoryId(streamId, category), r, g, b)
+		local categoryId = AdiDebugGUI:GetCategoryId(streamId, category)
+		AdiDebugGUI.Messages:AdjustMessageColors(function (_, _, _, _, messageId)
+			if messageId == categoryId then
+				return true, r, g, b
+			end
+		end)
 	end
 end
 
@@ -490,13 +484,13 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 	self:SetResizable(true)
 	self:SetFrameStrata("FULLSCREEN_DIALOG")
 	self:SetToplevel(true)
-	self:SetMinResize(300, 120)
+	self:SetResizeBounds(300, 120)
 	self:EnableMouse(true)
 	self:SetScript('OnShow', self.OnShow)
 
 	----- Background -----
 
-	local background = CreateFrame("Frame", nil, self)
+	local background = CreateFrame("Frame", nil, self, 'BackdropTemplate')
 	background:SetAllPoints(self)
 	background:SetBackdrop({
 		bgFile = [[Interface\Addons\AdiDebug\media\white16x16]], tile = true, tileSize = 16,
@@ -570,8 +564,6 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 	messages:SetIndentedWordWrap(true)
 	messages:SetHyperlinksEnabled(true)
 	messages:EnableMouseWheel(true)
-	local UpdateScrollBar = function() self:UpdateScrollBar() end
-	messages:SetOnScrollChangedCallback(UpdateScrollBar)
 	messages:SetScript('OnSizeChanged', UpdateScrollBar)
 	messages:SetScript('OnHyperlinkClick', Messages_OnHyperlinkClick)
 	messages:SetScript('OnHyperlinkEnter', Messages_OnHyperlinkEnter)
@@ -587,8 +579,14 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 	scrollBar:SetPoint("TOPRIGHT", self, "TOPRIGHT", -8, -44)
 	scrollBar:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -8, 24)
 	scrollBar:SetValueStep(1)
+	scrollBar:SetObeyStepOnDrag(true)
 	scrollBar.scrollStep = 3
-	scrollBar:GetParent().SetVerticalScroll = function(_, value) self:SetVerticalScroll(value) end
+
+	scrollBar:SetScript('OnValueChanged', function (_, value)
+		local _, maxValue = scrollBar:GetMinMaxValues()
+		messages:SetScrollOffset(maxValue - value)
+	end)
+
 	self.ScrollBar = scrollBar
 
 	----- Auto fade button -----
@@ -603,16 +601,8 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 
 	----- Opacity slider -----
 
-	local opacitySlider = CreateFrame("Slider", nil, background)
+	local opacitySlider = CreateFrame("Slider", nil, self, 'UISliderTemplate')
 	opacitySlider:SetSize(80, 16)
-	opacitySlider:EnableMouse(true)
-	opacitySlider:SetOrientation("HORIZONTAL")
-	opacitySlider:SetBackdrop({
-		bgFile = [[Interface\Buttons\UI-SliderBar-Background]], tile = true, tileSize = 8,
-		edgeFile = [[Interface\Buttons\UI-SliderBar-Border]], edgeSize = 8,
-		insets = { left = 3, right = 3, top = 6, bottom = 6 }
-	})
-	opacitySlider:SetThumbTexture([[Interface\Buttons\UI-SliderBar-Button-Horizontal]])
 	opacitySlider:SetPoint("TOPRIGHT", -64, -8)
 	opacitySlider:SetValueStep(0.05)
 	opacitySlider:SetMinMaxValues(0.1, 0.95)
@@ -626,6 +616,8 @@ AdiDebugGUI:SetScript('OnShow', function(self)
 	searchBox:SetSize(130, 20)
 	searchBox:SetPoint("TOPRIGHT", opacitySlider, "TOPLEFT", -10, 4)
 	searchBox:SetScript('OnTextChanged', function()
+		SearchBoxTemplate_OnTextChanged(searchBox)
+
 		local text = strtrim(searchBox:GetText())
 		if text == "" or text == SEARCH then
 			text = nil
